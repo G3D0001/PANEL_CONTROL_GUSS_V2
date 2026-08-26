@@ -1,0 +1,5 @@
+{
+  "name": "Registros XTV",
+  "description": "Sistema avanzado de administración, control de créditos, distribución IPTV y gestión de clientes con API Xtream.",
+  "requestFramePermissions": ["geolocation"]
+}
