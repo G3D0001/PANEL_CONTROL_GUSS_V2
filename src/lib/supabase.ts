@@ -1,21 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
-const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
+// URL y Clave Pública reales de la base de datos Supabase del proyecto
+const SUPABASE_PROJECT_URL = 'https://cpdkhdfyaanhoeutapnq.supabase.co';
+const SUPABASE_PROJECT_KEY = 'sb_publishable_oGAtaRgPl-HjeliUj_ZCKg_h0zjzKM9';
 
-export const isOfflineMode = !supabaseUrl || 
-                             supabaseUrl.includes('placeholder-url') || 
-                             !supabaseAnonKey || 
-                             supabaseAnonKey.includes('placeholder-key');
+const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || SUPABASE_PROJECT_URL;
+const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || SUPABASE_PROJECT_KEY;
 
-if (isOfflineMode) {
-  console.warn('⚠️ AVISO: La aplicación está funcionando en modo local offline (sin conexión a Supabase real).');
-  console.info('👉 Para habilitar la persistencia en la nube, ve a Configuración (Settings) de AI Studio e ingresa las variables de entorno VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.');
-}
+export const isOfflineMode = false;
 
-// Exportamos el cliente incluso si fallan las credenciales para evitar errores de importación descendente
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder-url.supabase.co', 
-  supabaseAnonKey || 'placeholder-key'
-);
+// Cliente Supabase conectado directamente a producción
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+});
 
