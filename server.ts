@@ -623,6 +623,7 @@ async function startServer() {
       let rawResponse: any = null;
       let successBaseUrl = "";
       let lastError = "";
+      const resellerWarnings: Array<{ field: string; code: string; message: string }> = [];
 
       // Parsear dominio y puerto de manera minuciosa para armar candidatos inteligentes sin puertos de streaming
       let hostWithoutPort = baseUrl;

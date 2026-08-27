@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider, useApp } from './context/AppContext';
 import { Toaster } from 'sonner';
 import { IptvRealtimeNotifier } from './components/IptvRealtimeNotifier';
+import { ThemeToggle } from './components/ThemeToggle';
 
 // Vistas ligeras del flujo de autenticación: se cargan siempre, se dejan directas.
 import { Login } from './components/Login';
@@ -284,8 +285,13 @@ function AppContent() {
                 </div>
                 <span className="font-black text-slate-900 dark:text-white tracking-tight">G3D System</span>
               </div>
-              <div className="w-12" /> {/* Spacer */}
+              <ThemeToggle variant="icon" />
             </header>
+
+            {/* Desktop Theme Toggle Pill - Fijado en esquina superior derecha */}
+            <div className="hidden lg:flex fixed top-5 right-8 z-40 pointer-events-auto">
+              <ThemeToggle variant="pill" />
+            </div>
 
             <div className="flex-1 lg:p-8 overflow-y-auto">
                <Suspense fallback={<RouteFallback />}>

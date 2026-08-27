@@ -46,7 +46,9 @@ import {
   DollarSign,
   MessageSquareText,
   CheckCircle2,
-  LayoutGrid
+  LayoutGrid,
+  Key,
+  ShieldAlert
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
@@ -1423,224 +1425,96 @@ export function HomeView() {
 
   const configMenuItems = [
     {
-      id: 'at_catalogo',
-      title: 'Catálogo & Stock',
-      shortTitle: 'Catálogo',
-      description: 'Acceso directo a la lista de productos y niveles de stock.',
-      icon: ICON_MAP['Package'] || Package,
-      defaultIconName: 'Package',
-      color1: '#f59e0b',
-      color2: '#b45309',
-      innerBg: 'from-amber-400 to-orange-600',
-      shadowColor: 'rgba(245, 158, 11, 0.45)',
+      id: 'cfg_profile',
+      title: 'Mi Perfil Personal',
+      shortTitle: 'Perfil',
+      description: 'Datos de contacto, clave de acceso, dirección y avatar personal.',
+      icon: ICON_MAP['User'] || User,
+      defaultIconName: 'User',
+      color1: '#e1007e',
+      color2: '#91004e',
+      innerBg: 'from-pink-400 to-rose-600',
+      shadowColor: 'rgba(225, 0, 126, 0.45)',
       action: () => {
-        if (!hasPermission('Config.Catalogo.Acceder')) {
-          toast.warning("No tienes permiso de Acceso para esta función (Config.Catalogo.Acceder)");
-          return;
-        }
-        navigate('/mis-productos');
+        navigate('/configuracion?tab=profile');
       },
-      badge: 'Atajo'
+      badge: 'Cuenta'
     },
     {
-      id: 'at_moderacion',
-      title: 'Moderación Store',
-      shortTitle: 'Moderación',
-      description: 'Acceso directo al panel de control y bloqueo de productos.',
-      icon: ICON_MAP['Lock'] || Lock,
-      defaultIconName: 'Lock',
-      color1: '#ef4444',
-      color2: '#b91c1c',
-      innerBg: 'from-red-400 to-red-700',
-      shadowColor: 'rgba(239, 68, 68, 0.45)',
-      action: () => {
-        if (!hasPermission('Config.Moderacion.Acceder')) {
-          toast.warning("No tienes permiso de Acceso para esta función (Config.Moderacion.Acceder)");
-          return;
-        }
-        navigate('/moderacion');
-      },
-      badge: 'Atajo'
-    },
-    {
-      id: 'at_pedidos',
-      title: 'Pedidos (v1)',
-      shortTitle: 'Pedidos',
-      description: 'Ver listado y estados de despachos tradicionales.',
-      icon: ICON_MAP['ReceiptText'] || ReceiptText,
-      defaultIconName: 'ReceiptText',
-      color1: '#3b82f6',
-      color2: '#1d4ed8',
-      innerBg: 'from-blue-400 to-blue-700',
-      shadowColor: 'rgba(59, 130, 246, 0.45)',
-      action: () => {
-        if (!hasPermission('Config.Pedidos.Acceder')) {
-          toast.warning("No tienes permiso de Acceso para esta función (Config.Pedidos.Acceder)");
-          return;
-        }
-        navigate('/pedidos');
-      },
-      badge: 'Atajo'
-    },
-    {
-      id: 'at_clasificacion',
-      title: 'Categorías y Flujos',
-      shortTitle: 'Clasificar',
-      description: 'Administración de flujos de trabajo y taxonomía de venta.',
-      icon: ICON_MAP['Database'] || Database,
-      defaultIconName: 'Database',
-      color1: '#8b5cf6',
-      color2: '#5b21b6',
-      innerBg: 'from-purple-400 to-indigo-650',
-      shadowColor: 'rgba(139, 92, 246, 0.45)',
-      action: () => {
-        if (!hasPermission('Config.Clasificacion.Acceder')) {
-          toast.warning("No tienes permiso de Acceso para esta función (Config.Clasificacion.Acceder)");
-          return;
-        }
-        navigate('/clasificacion');
-      },
-      badge: 'Atajo'
-    },
-    {
-      id: 'at_proveedores',
-      title: 'Proveedores',
-      shortTitle: 'Proveedores',
-      description: 'Control de insumos, costos y tiempos de reposición.',
+      id: 'cfg_business',
+      title: 'Negocio & Marca',
+      shortTitle: 'Negocio',
+      description: 'Logos oficiales, datos de facturación CUIT/DNI, teléfono y redes sociales.',
       icon: ICON_MAP['Building2'] || Building2,
       defaultIconName: 'Building2',
-      color1: '#ec4899',
-      color2: '#db2777',
-      innerBg: 'from-pink-400 to-rose-600',
-      shadowColor: 'rgba(236, 72, 153, 0.45)',
-      action: () => {
-        if (!hasPermission('Config.Proveedores.Acceder')) {
-          toast.warning("No tienes permiso de Acceso para esta función (Config.Proveedores.Acceder)");
-          return;
-        }
-        navigate('/proveedores');
-      },
-      badge: 'Atajo'
-    },
-    {
-      id: 'at_revendedores',
-      title: 'Revendedores',
-      shortTitle: 'Red',
-      description: 'Gestión y control de miembros del equipo de ventas.',
-      icon: ICON_MAP['Users'] || Users,
-      defaultIconName: 'Users',
       color1: '#06b6d4',
       color2: '#0891b2',
       innerBg: 'from-cyan-400 to-teal-600',
       shadowColor: 'rgba(6, 182, 212, 0.45)',
       action: () => {
-        if (!hasPermission('Config.Revendedores.Acceder')) {
-          toast.warning("No tienes permiso de Acceso para esta función (Config.Revendedores.Acceder)");
-          return;
-        }
-        navigate('/revendedores');
+        navigate('/configuracion?tab=businesses');
       },
-      badge: 'Atajo'
+      badge: 'Identidad'
     },
     {
-      id: 'at_logistica',
-      title: 'Logística Central',
-      shortTitle: 'Logística',
-      description: 'Configuración de fleteros, envíos Uber y delivery propio.',
-      icon: ICON_MAP['Smartphone'] || Smartphone,
-      defaultIconName: 'Smartphone',
-      color1: '#10b981',
-      color2: '#059669',
-      innerBg: 'from-emerald-400 to-green-600',
-      shadowColor: 'rgba(16, 185, 129, 0.45)',
+      id: 'cfg_permissions',
+      title: 'Consola de Permisos RBAC',
+      shortTitle: 'Permisos',
+      description: 'Gestión de roles maestros, herencias y excepciones por usuario.',
+      icon: ICON_MAP['ShieldCheck'] || ShieldCheck,
+      defaultIconName: 'ShieldCheck',
+      color1: '#8b5cf6',
+      color2: '#5b21b6',
+      innerBg: 'from-purple-400 to-indigo-650',
+      shadowColor: 'rgba(139, 92, 246, 0.45)',
       action: () => {
-        if (!hasPermission('Config.Logistica.Acceder')) {
-          toast.warning("No tienes permiso de Acceso para esta función (Config.Logistica.Acceder)");
+        if (!hasPermission('Admin.VistaGeneral.Ver')) {
+          toast.warning("Se requiere nivel de Administrador para gestionar roles");
           return;
         }
-        navigate('/logistica');
+        navigate('/configuracion?tab=permissions');
       },
-      badge: 'Atajo'
+      badge: 'Seguridad'
     },
     {
-      id: 'at_reportes',
-      title: 'Centro de Reportes',
-      shortTitle: 'Auditoría',
-      description: 'Reporte de errores del sistema y estados operativos.',
-      icon: ICON_MAP['HelpCircle'] || HelpCircle,
-      defaultIconName: 'HelpCircle',
+      id: 'cfg_apis',
+      title: 'Conexión APIs & Panel XC',
+      shortTitle: 'APIs',
+      description: 'Credenciales del panel Xtream-Masters, tokens y pasarelas de pago.',
+      icon: ICON_MAP['Key'] || Key,
+      defaultIconName: 'Key',
       color1: '#f59e0b',
       color2: '#d97706',
       innerBg: 'from-amber-400 to-orange-600',
       shadowColor: 'rgba(245, 158, 11, 0.45)',
       action: () => {
-        if (!hasPermission('Config.Reportes.Acceder')) {
-          toast.warning("No tienes permiso de Acceso para esta función (Config.Reportes.Acceder)");
+        if (!hasPermission('Admin.VistaGeneral.Ver')) {
+          toast.warning("Se requiere nivel de Administrador para gestionar integraciones");
           return;
         }
-        navigate('/reportes');
+        navigate('/configuracion?tab=apis');
       },
-      badge: 'Atajo'
+      badge: 'Integración'
     },
     {
-      id: 'at_historial',
-      title: 'Historial',
-      shortTitle: 'Bitácora',
-      description: 'Registro de auditoría general de todos los movimientos.',
-      icon: ICON_MAP['HelpCircle'] || HelpCircle,
-      defaultIconName: 'HelpCircle',
-      color1: '#64748b',
-      color2: '#475569',
-      innerBg: 'from-slate-400 to-slate-650',
-      shadowColor: 'rgba(100, 116, 139, 0.45)',
+      id: 'cfg_security',
+      title: 'Seguridad del Sistema',
+      shortTitle: 'Auditoría',
+      description: 'Registro de accesos, bloqueo de sesiones y protocolos de contingencia.',
+      icon: ICON_MAP['ShieldAlert'] || ShieldAlert,
+      defaultIconName: 'ShieldAlert',
+      color1: '#ef4444',
+      color2: '#b91c1c',
+      innerBg: 'from-red-400 to-red-700',
+      shadowColor: 'rgba(239, 68, 68, 0.45)',
       action: () => {
-        if (!hasPermission('Config.Historial.Acceder')) {
-          toast.warning("No tienes permiso de Acceso para esta función (Config.Historial.Acceder)");
+        if (!hasPermission('Admin.VistaGeneral.Ver')) {
+          toast.warning("Se requiere nivel de Administrador para seguridad del sistema");
           return;
         }
-        navigate('/historial');
+        navigate('/configuracion?tab=security');
       },
-      badge: 'Atajo'
-    },
-    {
-      id: 'at_apps',
-      title: 'Aplicaciones',
-      shortTitle: 'Apps',
-      description: 'Administración de otras aplicaciones conectadas.',
-      icon: ICON_MAP['Tv'] || Tv,
-      defaultIconName: 'Tv',
-      color1: '#3b82f6',
-      color2: '#1d4ed8',
-      innerBg: 'from-blue-400 to-blue-700',
-      shadowColor: 'rgba(59, 130, 246, 0.45)',
-      action: () => {
-        if (!hasPermission('Config.Apps.Acceder')) {
-          toast.warning("No tienes permiso de Acceso para esta función (Config.Apps.Acceder)");
-          return;
-        }
-        navigate('/apps');
-      },
-      badge: 'Atajo'
-    },
-    {
-      id: 'at_config',
-      title: 'Ajustes de Sistema',
-      shortTitle: 'Ajustes',
-      description: 'Preferencias globales de la marca y base de datos.',
-      icon: ICON_MAP['Settings'] || Settings,
-      defaultIconName: 'Settings',
-      color1: '#64748b',
-      color2: '#334155',
-      innerBg: 'from-slate-400 to-slate-600',
-      shadowColor: 'rgba(100, 116, 139, 0.45)',
-      action: () => {
-        if (!hasPermission('Config.Ajustes.Acceder')) {
-          toast.warning("No tienes permiso de Acceso para esta función (Config.Ajustes.Acceder)");
-          return;
-        }
-        navigate('/configuracion');
-      },
-      badge: 'Atajo'
+      badge: 'Protección'
     },
     {
       id: 'volver_main',
@@ -1658,118 +1532,159 @@ export function HomeView() {
       badge: 'Menú'
     }
   ].filter(item => {
-    if (item.id === 'at_catalogo') return hasPermission('Config.Catalogo.Ver');
-    if (item.id === 'at_moderacion') return hasPermission('Config.Moderacion.Ver');
-    if (item.id === 'at_pedidos') return hasPermission('Config.Pedidos.Ver');
-    if (item.id === 'at_clasificacion') return hasPermission('Config.Clasificacion.Ver');
-    if (item.id === 'at_proveedores') return hasPermission('Config.Proveedores.Ver');
-    if (item.id === 'at_revendedores') return hasPermission('Config.Revendedores.Ver');
-    if (item.id === 'at_logistica') return hasPermission('Config.Logistica.Ver');
-    if (item.id === 'at_reportes') return hasPermission('Config.Reportes.Ver');
-    if (item.id === 'at_historial') return hasPermission('Config.Historial.Ver');
-    if (item.id === 'at_apps') return hasPermission('Config.Apps.Ver');
-    if (item.id === 'at_config') return hasPermission('Config.Ajustes.Ver');
+    if (item.id === 'cfg_permissions' || item.id === 'cfg_apis' || item.id === 'cfg_security') {
+      return hasPermission('Admin.VistaGeneral.Ver') || userRole === 'Administrador' || userRole === 'Admin';
+    }
     return true;
   });
 
   const g3dMenuItems = [
     {
-      id: 'crear_pedido',
-      title: customization.cards?.crear_pedido?.title || 'Crear Pedido',
-      shortTitle: customization.cards?.crear_pedido?.title || 'Crear Pedido',
-      description: customization.cards?.crear_pedido?.description || 'Registrar un nuevo pedido o compra de productos en el sistema con asignación de fletero.',
-      icon: ICON_MAP[customization.cards?.crear_pedido?.iconName] || Plus,
-      defaultIconName: 'Plus',
-      color1: customization.cards?.crear_pedido?.color1 || '#10b981',
-      color2: customization.cards?.crear_pedido?.color2 || '#047857',
-      customIcon: customization.cards?.crear_pedido?.customIcon || null,
-      innerBg: 'from-emerald-400 to-green-600',
-      shadowColor: 'rgba(16, 185, 129, 0.45)',
-      action: () => {
-        if (!hasPermission('G3d.CrearPedido.Acceder')) {
-          toast.warning("No tienes permiso para acceder a esta sección (G3d.CrearPedido.Acceder)");
-          return;
-        }
-        setG3dOrderToEdit(null);
-        setG3dOrderForm(prev => ({
-          vendedor: prev.vendedor || '',
-          vendedor_telefono: prev.vendedor_telefono || '',
-          cliente_nombre: '',
-          cliente_telefono: '',
-          es_mayorista: false,
-          items: [
-            { id: 'item-' + Date.now(), cantidad: 1, item: '', descripcion: '', precio: '', imagen: '' }
-          ],
-          precio: '',
-          seña: '',
-          producto_confirmado: false
-        }));
-        setIsG3dOrderModalOpen(true);
-      },
-      badge: customization.cards?.crear_pedido?.badge || 'Nuevo'
-    },
-    {
-      id: 'lista_precios',
-      title: customization.cards?.lista_precios?.title || 'Lista de Precios',
-      shortTitle: customization.cards?.lista_precios?.title || 'Precios',
-      description: customization.cards?.lista_precios?.description || 'Catálogo completo de productos, variantes y administración de stock en tiempo real.',
-      icon: ICON_MAP[customization.cards?.lista_precios?.iconName] || Package,
+      id: 'g3d_catalogo',
+      title: customization.cards?.g3d_catalogo?.title || 'Catálogo & Stock',
+      shortTitle: 'Catálogo',
+      description: customization.cards?.g3d_catalogo?.description || 'Gestión de productos, stock, precios y variantes de la tienda web.',
+      icon: ICON_MAP[customization.cards?.g3d_catalogo?.iconName] || Package,
       defaultIconName: 'Package',
-      color1: customization.cards?.lista_precios?.color1 || '#f59e0b',
-      color2: customization.cards?.lista_precios?.color2 || '#b45309',
-      customIcon: customization.cards?.lista_precios?.customIcon || null,
+      color1: customization.cards?.g3d_catalogo?.color1 || '#f59e0b',
+      color2: customization.cards?.g3d_catalogo?.color2 || '#b45309',
+      customIcon: customization.cards?.g3d_catalogo?.customIcon || null,
       innerBg: 'from-amber-400 to-orange-600',
       shadowColor: 'rgba(245, 158, 11, 0.45)',
       action: () => {
-        if (!hasPermission('G3d.ListaPrecios.Acceder')) {
-          toast.warning("No tienes permiso para acceder a esta sección (G3d.ListaPrecios.Acceder)");
+        if (!hasPermission('Stock.VistaGeneral.Ver') && !hasPermission('Config.Catalogo.Acceder') && !hasPermission('G3d.Stock.Acceder')) {
+          toast.warning("No tienes permiso de Acceso para esta función (Stock.VistaGeneral.Ver)");
           return;
         }
-        navigate('/lista-precios');
+        navigate('/mis-productos');
       },
-      badge: customization.cards?.lista_precios?.badge || 'Catálogo'
+      badge: '📦 Catálogo'
     },
     {
-      id: 'pedidos_g3d',
-      title: customization.cards?.pedidos_g3d?.title || 'Pedidos',
-      shortTitle: customization.cards?.pedidos_g3d?.title || 'Pedidos',
-      description: customization.cards?.pedidos_g3d?.description || 'Monitoreo y administración del centro de pedidos, control de logística y estados de entrega.',
-      icon: ICON_MAP[customization.cards?.pedidos_g3d?.iconName] || ReceiptText,
+      id: 'g3d_moderacion',
+      title: customization.cards?.g3d_moderacion?.title || 'Moderación Store',
+      shortTitle: 'Moderación',
+      description: customization.cards?.g3d_moderacion?.description || 'Panel de control, visibilidad y moderación de productos publicados en la tienda.',
+      icon: ICON_MAP[customization.cards?.g3d_moderacion?.iconName] || Lock,
+      defaultIconName: 'Lock',
+      color1: customization.cards?.g3d_moderacion?.color1 || '#ef4444',
+      color2: customization.cards?.g3d_moderacion?.color2 || '#b91c1c',
+      customIcon: customization.cards?.g3d_moderacion?.customIcon || null,
+      innerBg: 'from-red-400 to-red-700',
+      shadowColor: 'rgba(239, 68, 68, 0.45)',
+      action: () => {
+        if (!hasPermission('Admin.VistaGeneral.Ver') && !hasPermission('Config.Moderacion.Acceder')) {
+          toast.warning("No tienes permiso de Acceso para esta función (Admin.VistaGeneral.Ver)");
+          return;
+        }
+        navigate('/moderacion');
+      },
+      badge: '🛡️ Moderación'
+    },
+    {
+      id: 'g3d_pedidos',
+      title: customization.cards?.g3d_pedidos?.title || 'Gestión de Pedidos',
+      shortTitle: 'Pedidos',
+      description: customization.cards?.g3d_pedidos?.description || 'Control y despacho de pedidos de clientes, cobranzas y estados de entrega.',
+      icon: ICON_MAP[customization.cards?.g3d_pedidos?.iconName] || ReceiptText,
       defaultIconName: 'ReceiptText',
-      color1: customization.cards?.pedidos_g3d?.color1 || '#3b82f6',
-      color2: customization.cards?.pedidos_g3d?.color2 || '#1d4ed8',
-      customIcon: customization.cards?.pedidos_g3d?.customIcon || null,
+      color1: customization.cards?.g3d_pedidos?.color1 || '#3b82f6',
+      color2: customization.cards?.g3d_pedidos?.color2 || '#1d4ed8',
+      customIcon: customization.cards?.g3d_pedidos?.customIcon || null,
       innerBg: 'from-blue-400 to-blue-700',
       shadowColor: 'rgba(59, 130, 246, 0.45)',
       action: () => {
-        if (!hasPermission('G3d.Pedidos.Acceder')) {
-          toast.warning("No tienes permiso para acceder a esta sección (G3d.Pedidos.Acceder)");
+        if (!hasPermission('Pedidos.VistaGeneral.Ver') && !hasPermission('Config.Pedidos.Acceder') && !hasPermission('G3d.Pedidos.Acceder')) {
+          toast.warning("No tienes permiso de Acceso para esta función (Pedidos.VistaGeneral.Ver)");
           return;
         }
-        navigate('/pedidos?tab=g3d_diseno');
+        navigate('/pedidos');
       },
-      badge: customization.cards?.pedidos_g3d?.badge || 'Logística'
+      badge: '📋 Ventas'
     },
     {
-      id: 'stock_g3d',
-      title: customization.cards?.stock_g3d?.title || 'Stock',
-      shortTitle: customization.cards?.stock_g3d?.title || 'Stock',
-      description: 'Gestión de insumos de fabricación, lista de precios de proveedores y componentes.',
-      icon: ICON_MAP['Database'] || Database,
+      id: 'g3d_clasificacion',
+      title: customization.cards?.g3d_clasificacion?.title || 'Categorías y Flujos',
+      shortTitle: 'Categorías',
+      description: customization.cards?.g3d_clasificacion?.description || 'Administración de flujos de trabajo, taxonomía y categorías de venta.',
+      icon: ICON_MAP[customization.cards?.g3d_clasificacion?.iconName] || Database,
       defaultIconName: 'Database',
-      color1: '#8b5cf6',
-      color2: '#5b21b6',
-      customIcon: null,
+      color1: customization.cards?.g3d_clasificacion?.color1 || '#8b5cf6',
+      color2: customization.cards?.g3d_clasificacion?.color2 || '#5b21b6',
+      customIcon: customization.cards?.g3d_clasificacion?.customIcon || null,
       innerBg: 'from-purple-400 to-indigo-650',
       shadowColor: 'rgba(139, 92, 246, 0.45)',
       action: () => {
-        if (!hasPermission('G3d.Stock.Acceder')) {
-          toast.warning("No tienes permiso para acceder a esta sección (G3d.Stock.Acceder)");
+        if (!hasPermission('Admin.VistaGeneral.Ver') && !hasPermission('Config.Clasificacion.Acceder')) {
+          toast.warning("No tienes permiso de Acceso para esta función (Admin.VistaGeneral.Ver)");
           return;
         }
-        navigate('/mis-productos?tab=g3d_precios');
+        navigate('/clasificacion');
       },
-      badge: 'Insumos'
+      badge: '🗂️ Estructura'
+    },
+    {
+      id: 'g3d_proveedores',
+      title: customization.cards?.g3d_proveedores?.title || 'Proveedores',
+      shortTitle: 'Proveedores',
+      description: customization.cards?.g3d_proveedores?.description || 'Control de proveedores, costos de insumos y reposición de materiales.',
+      icon: ICON_MAP[customization.cards?.g3d_proveedores?.iconName] || Building2,
+      defaultIconName: 'Building2',
+      color1: customization.cards?.g3d_proveedores?.color1 || '#ec4899',
+      color2: customization.cards?.g3d_proveedores?.color2 || '#db2777',
+      customIcon: customization.cards?.g3d_proveedores?.customIcon || null,
+      innerBg: 'from-pink-400 to-rose-600',
+      shadowColor: 'rgba(236, 72, 153, 0.45)',
+      action: () => {
+        if (!hasPermission('Stock.VistaGeneral.Ver') && !hasPermission('Config.Proveedores.Acceder')) {
+          toast.warning("No tienes permiso de Acceso para esta función (Stock.VistaGeneral.Ver)");
+          return;
+        }
+        navigate('/proveedores');
+      },
+      badge: '🏭 Proveedores'
+    },
+    {
+      id: 'g3d_revendedores',
+      title: customization.cards?.g3d_revendedores?.title || 'Revendedores',
+      shortTitle: 'Revendedores',
+      description: customization.cards?.g3d_revendedores?.description || 'Gestión y control del equipo de ventas y distribución comercial de la tienda.',
+      icon: ICON_MAP[customization.cards?.g3d_revendedores?.iconName] || Users,
+      defaultIconName: 'Users',
+      color1: customization.cards?.g3d_revendedores?.color1 || '#06b6d4',
+      color2: customization.cards?.g3d_revendedores?.color2 || '#0891b2',
+      customIcon: customization.cards?.g3d_revendedores?.customIcon || null,
+      innerBg: 'from-cyan-400 to-teal-600',
+      shadowColor: 'rgba(6, 182, 212, 0.45)',
+      action: () => {
+        if (!hasPermission('Admin.VistaGeneral.Ver') && !hasPermission('Config.Revendedores.Acceder')) {
+          toast.warning("No tienes permiso de Acceso para esta función (Admin.VistaGeneral.Ver)");
+          return;
+        }
+        navigate('/revendedores');
+      },
+      badge: '👥 Red Venta'
+    },
+    {
+      id: 'g3d_logistica',
+      title: customization.cards?.g3d_logistica?.title || 'Logística Central',
+      shortTitle: 'Logística',
+      description: customization.cards?.g3d_logistica?.description || 'Torre de control logística, tarifas de fleteros, Uber Envíos y cadetería propia.',
+      icon: ICON_MAP[customization.cards?.g3d_logistica?.iconName] || Smartphone,
+      defaultIconName: 'Smartphone',
+      color1: customization.cards?.g3d_logistica?.color1 || '#10b981',
+      color2: customization.cards?.g3d_logistica?.color2 || '#059669',
+      customIcon: customization.cards?.g3d_logistica?.customIcon || null,
+      innerBg: 'from-emerald-400 to-green-600',
+      shadowColor: 'rgba(16, 185, 129, 0.45)',
+      action: () => {
+        if (!hasPermission('Logistica.VistaGeneral.Ver') && !hasPermission('Config.Logistica.Acceder')) {
+          toast.warning("No tienes permiso de Acceso para esta función (Logistica.VistaGeneral.Ver)");
+          return;
+        }
+        navigate('/logistica');
+      },
+      badge: '🚚 Envíos'
     },
     {
       id: 'volver_main',
@@ -1783,14 +1698,17 @@ export function HomeView() {
       customIcon: null,
       innerBg: 'from-slate-400 to-slate-600',
       shadowColor: 'rgba(100, 116, 139, 0.45)',
-      action: () => setActiveMenu('main'),
+      action: () => changeMenu('main'),
       badge: 'Menú'
     }
   ].filter(item => {
-    if (item.id === 'crear_pedido') return hasPermission('G3d.CrearPedido.Ver');
-    if (item.id === 'lista_precios') return hasPermission('G3d.ListaPrecios.Ver');
-    if (item.id === 'pedidos_g3d') return hasPermission('G3d.Pedidos.Ver');
-    if (item.id === 'stock_g3d') return hasPermission('G3d.Stock.Ver');
+    if (item.id === 'g3d_catalogo') return hasPermission('Stock.VistaGeneral.Ver') || hasPermission('Config.Catalogo.Ver') || hasPermission('G3d.Stock.Ver');
+    if (item.id === 'g3d_moderacion') return hasPermission('Admin.VistaGeneral.Ver') || hasPermission('Config.Moderacion.Ver');
+    if (item.id === 'g3d_pedidos') return hasPermission('Pedidos.VistaGeneral.Ver') || hasPermission('Config.Pedidos.Ver') || hasPermission('G3d.Pedidos.Ver');
+    if (item.id === 'g3d_clasificacion') return hasPermission('Admin.VistaGeneral.Ver') || hasPermission('Config.Clasificacion.Ver');
+    if (item.id === 'g3d_proveedores') return hasPermission('Stock.VistaGeneral.Ver') || hasPermission('Config.Proveedores.Ver');
+    if (item.id === 'g3d_revendedores') return hasPermission('Admin.VistaGeneral.Ver') || hasPermission('Config.Revendedores.Ver');
+    if (item.id === 'g3d_logistica') return hasPermission('Logistica.VistaGeneral.Ver') || hasPermission('Config.Logistica.Ver');
     return true;
   });
 

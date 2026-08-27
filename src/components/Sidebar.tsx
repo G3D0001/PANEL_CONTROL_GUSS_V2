@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { 
@@ -30,6 +30,7 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { apiService } from '../services/apiService';
 import { PERMISSIONS } from '../types/permissions';
+import { ThemeToggle } from './ThemeToggle';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -38,31 +39,75 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
-  const [isInicioExpanded, setIsInicioExpanded] = useState(true);
-  const [isAppsExpanded, setIsAppsExpanded] = useState(true);
+
+  // Comprobar si la ruta actual pertenece a cada grupo
+  const isG3dActive = useMemo(() => {
+    const g3dPaths = ["/mis-productos", "/pedidos", "/moderacion", "/clasificacion", "/proveedores", "/revendedores", "/logistica"];
+    return g3dPaths.some(p => location.pathname === p) || (location.pathname === '/' && location.search.includes('menu=g3d'));
+  }, [location.pathname, location.search]);
+
+  const isXtvActive = useMemo(() => {
+    return location.pathname.startsWith('/xtv') || (location.pathname === '/' && location.search.includes('menu=xtv'));
+  }, [location.pathname, location.search]);
+
+  const isAppsActive = useMemo(() => {
+    return location.pathname === '/apps' || location.pathname === '/simulador';
+  }, [location.pathname]);
+
+  const isSystemActive = useMemo(() => {
+    return location.pathname === '/reportes' || location.pathname === '/historial' || location.pathname === '/configuracion';
+  }, [location.pathname]);
+
+  // Estados de apertura de grupos (cerrados por defecto salvo que la ruta actual pertenezca al grupo)
+  const [isG3dExpanded, setIsG3dExpanded] = useState(() => isG3dActive);
+  const [isXtvExpanded, setIsXtvExpanded] = useState(() => isXtvActive);
+  const [isAppsExpanded, setIsAppsExpanded] = useState(() => isAppsActive);
+  const [isSystemExpanded, setIsSystemExpanded] = useState(() => isSystemActive);
+
+  // Sincronizar apertura automática al navegar a una sección
+  useEffect(() => {
+    if (isG3dActive) setIsG3dExpanded(true);
+    if (isXtvActive) setIsXtvExpanded(true);
+    if (isAppsActive) setIsAppsExpanded(true);
+    if (isSystemActive) setIsSystemExpanded(true);
+  }, [isG3dActive, isXtvActive, isAppsActive, isSystemActive]);
+
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'error' | 'offline'>('checking');
   const [pendingReports, setPendingReports] = useState(0);
   const { user, userRole, userPermissions, hasPermission, signOut } = useAuth();
   const { businessProfile } = useApp();
 
-  const navItems = [
+  // Módulo G3D - Tienda Web
+  const g3dItems = [
     { to: "/mis-productos", label: "Catálogo & Stock", icon: Package, permission: PERMISSIONS.STOCK.ACCEDER_CATALOGO.id },
+    { to: "/pedidos", label: "Gestión de Pedidos", icon: ReceiptText, permission: PERMISSIONS.PEDIDOS.ACCEDER_PEDIDOS.id },
     { to: "/moderacion", label: "Moderación Store", icon: Lock, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
-    { to: "/pedidos", label: "Pedidos", icon: ReceiptText, permission: PERMISSIONS.PEDIDOS.ACCEDER_PEDIDOS.id },
-    { to: "/pedidos-v2", label: "Pedidos v2", icon: Sparkles, permission: PERMISSIONS.PEDIDOS.ACCEDER_PEDIDOS.id },
     { to: "/clasificacion", label: "Categorías y Flujos", icon: LayoutGrid, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
     { to: "/proveedores", label: "Proveedores", icon: Truck, permission: PERMISSIONS.STOCK.ACCEDER_CATALOGO.id },
     { to: "/revendedores", label: "Revendedores", icon: Building2, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
     { to: "/logistica", label: "Logística Central", icon: Navigation, permission: PERMISSIONS.LOGISTICA.ACCEDER_LOGISTICA.id },
+  ].filter(item => hasPermission(item.permission));
+
+  // Módulo XTV - TV Digital
+  const xtvItems = [
+    { to: "/xtv?menu=crear_directo", label: "Crear Línea Directa", icon: Sparkles, permission: 'Iptv.CrearDirecto.Ver' },
+    { to: "/xtv?menu=solicitar_activacion", label: "Solicitar / Demo", icon: Tv, permission: 'Iptv.SolicitarActivacion.Ver' },
+    { to: "/xtv?menu=renovaciones", label: "Renovaciones", icon: Rotate3d, permission: 'Iptv.Renovaciones.Ver' },
+    { to: "/xtv?menu=mis_clientes", label: "Mis Clientes", icon: User, permission: 'Iptv.Clientes.Ver' },
+    { to: "/xtv?menu=finanzas", label: "Solicitudes & Créditos", icon: ReceiptText, permission: 'Iptv.Solicitudes.Ver' },
+  ].filter(item => hasPermission(item.permission) || hasPermission('Iptv.*') || hasPermission('Admin.*'));
+
+  // Módulo Sistema & Auditoría
+  const systemItems = [
     { to: "/reportes", label: "Centro de Reportes", icon: Bug, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id, badge: true },
-    { to: "/historial", label: "Historial", icon: History, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
-  ];
+    { to: "/historial", label: "Historial de Auditoría", icon: History, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
+    { to: "/configuracion", label: "Ajustes del Sistema", icon: Settings, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
+  ].filter(item => hasPermission(item.permission) || userRole === 'Admin' || userRole === 'Administrador');
 
-  const visibleNavItems = navItems.filter(item => {
-    return hasPermission(item.permission);
-  });
-
+  const canShowG3d = g3dItems.length > 0;
+  const canShowXtv = xtvItems.length > 0 || hasPermission('Inicio.Xtv.Ver') || hasPermission('Iptv.*');
   const canShowApps = hasPermission('Admin.VistaGeneral.Ver') || hasPermission(PERMISSIONS.STOCK.ACCEDER_CATALOGO.id);
+  const canShowSystem = systemItems.length > 0;
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -159,8 +204,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           )}
         </div>
 
-        <nav className="flex-1 flex flex-col gap-1 overflow-y-auto pr-2 -mr-3 custom-scrollbar">
-          {/* Item Padre - Inicio */}
+        <nav className="flex-1 flex flex-col gap-1.5 overflow-y-auto pr-2 -mr-3 custom-scrollbar">
+          {/* 1. SECCIÓN: INICIO GENERAL */}
           <div className="flex flex-col">
             <div
               className={cn(
@@ -182,171 +227,174 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     location.pathname === '/' && (location.search === '' || location.search.includes('menu=main')) ? "scale-110 text-primary drop-shadow-[0_0_8px_rgba(0,194,255,0.4)]" : "text-slate-400 group-hover:text-primary"
                   )} 
                 />
-                <span className="text-[13px] font-bold tracking-tight">Inicio</span>
+                <span className="text-[13px] font-bold tracking-tight">Inicio General</span>
               </NavLink>
-              
-              <button
-                onClick={() => setIsInicioExpanded(!isInicioExpanded)}
-                className="p-2.5 mr-1 hover:bg-slate-200/50 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
-              >
-                <ChevronDown 
-                  size={16} 
-                  className={cn(
-                    "text-slate-400 group-hover:text-slate-600 transition-transform duration-300 ease-out",
-                    isInicioExpanded ? "rotate-180" : ""
-                  )}
-                />
-              </button>
             </div>
-
-            {/* Items Hijos - Conexiones y Atajos */}
-            {isInicioExpanded && (
-              <div className="relative pl-7 pr-1 py-1 flex flex-col gap-1">
-                {/* Vertical tree branch guide line */}
-                <div className="absolute left-[18px] top-0 bottom-4 w-px bg-slate-200 dark:bg-slate-800/80 pointer-events-none" />
-
-                {/* 1. Inicio G3D */}
-                {hasPermission('Inicio.G3d.Ver') && (
-                  <NavLink
-                    to="/?menu=g3d"
-                    onClick={onClose}
-                    className={cn(
-                      "flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-[12px] font-bold relative overflow-hidden",
-                      location.pathname === '/' && location.search.includes('menu=g3d')
-                        ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-white/5"
-                        : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/20"
-                    )}
-                  >
-                    <div className="size-1.5 rounded-full bg-orange-500 shrink-0 animate-pulse" />
-                    <span className="truncate">Inicio G3D</span>
-                  </NavLink>
-                )}
-
-                {/* 2. Inicio XTV */}
-                {hasPermission('Inicio.Xtv.Ver') && (
-                  <NavLink
-                    to="/?menu=xtv"
-                    onClick={onClose}
-                    className={cn(
-                      "flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-[12px] font-bold relative overflow-hidden",
-                      location.pathname === '/' && location.search.includes('menu=xtv')
-                        ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-white/5"
-                        : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/20"
-                    )}
-                  >
-                    <div className="size-1.5 rounded-full bg-blue-500 shrink-0 animate-pulse" />
-                    <span className="truncate">Inicio XTV</span>
-                  </NavLink>
-                )}
-
-                {/* 3. Configuraciones */}
-                {hasPermission('Inicio.Config.Ver') && (
-                  <NavLink
-                    to="/?menu=config"
-                    onClick={onClose}
-                    className={cn(
-                      "flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-[12px] font-bold relative overflow-hidden",
-                      location.pathname === '/' && location.search.includes('menu=config')
-                        ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-white/5"
-                        : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/20"
-                    )}
-                  >
-                    <div className="size-1.5 rounded-full bg-pink-500 shrink-0" />
-                    <span className="truncate">Configuraciones</span>
-                  </NavLink>
-                )}
-              </div>
-            )}
           </div>
 
-          {visibleNavItems.map((item) => (
-            <NavLink 
-              key={item.to}
-              to={item.to} 
-              onClick={onClose}
-              className={({ isActive }) => cn(
-                "flex items-center gap-3 px-4 py-2 rounded-xl transition-colors duration-150 duration-300 group relative overflow-hidden",
-                isActive 
-                  ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-md ring-1 ring-slate-200 dark:ring-white/10" 
-                  : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50"
-              )}
-            >
-              {({ isActive }) => (
-                <>
-                  {isActive && (
-                    <motion.div 
-                      layoutId="sidebar-active"
-                      className="absolute inset-0 bg-white dark:bg-slate-800 -z-10" 
-                    />
-                  )}
-                  <div className="relative shrink-0">
-                    <item.icon 
-                      size={18} 
-                      className={cn(
-                        "transition-colors duration-150 duration-500", 
-                        isActive ? "scale-110 text-primary drop-shadow-[0_0_8px_rgba(0,194,255,0.4)]" : "text-slate-400 group-hover:text-primary group-"
-                      )} 
-                    />
-                    {item.badge && pendingReports > 0 && (
-                      <div className="absolute -top-1 -right-1 size-2.5 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900 " />
-                    )}
-                  </div>
-                  <span className={cn(
-                    "text-[13px] font-bold tracking-tight transition-colors duration-150 duration-300",
-                    isActive ? "translate-x-1" : "group-"
-                  )}>{item.label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
-
-          {/* Item Padre - Aplicaciones */}
-          {canShowApps && (
+          {/* 2. SECCIÓN: TIENDA G3D */}
+          {canShowG3d && (
             <div className="flex flex-col">
-              <div
+              <button
+                type="button"
+                onClick={() => setIsG3dExpanded(!isG3dExpanded)}
                 className={cn(
-                  "w-full flex items-center justify-between rounded-xl transition-colors duration-150 group relative overflow-hidden text-left",
-                  location.pathname === '/apps'
-                    ? "bg-slate-100 dark:bg-slate-900/40 text-slate-900 dark:text-white font-black" 
-                    : "text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50"
+                  "w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-150 group relative overflow-hidden text-left cursor-pointer select-none",
+                  isG3dActive
+                    ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold shadow-xs border border-orange-500/20" 
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
                 )}
               >
-                <NavLink
-                  to="/apps"
-                  onClick={onClose}
-                  className="flex-1 flex items-center gap-3 px-4 py-2 cursor-pointer"
-                >
+                <div className="flex items-center gap-3">
+                  <Package 
+                    size={18} 
+                    className={cn(
+                      "transition-colors duration-150",
+                      isG3dActive ? "text-orange-500 scale-105" : "text-slate-400 group-hover:text-orange-500"
+                    )} 
+                  />
+                  <span className="text-[13px] font-bold tracking-tight">Tienda G3D</span>
+                </div>
+                
+                <div className="p-1 rounded-lg transition-colors">
+                  <ChevronDown 
+                    size={15} 
+                    className={cn(
+                      "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform duration-300 ease-out",
+                      isG3dExpanded ? "rotate-180 text-orange-500" : ""
+                    )}
+                  />
+                </div>
+              </button>
+
+              {isG3dExpanded && (
+                <div className="relative pl-7 pr-1 py-1 flex flex-col gap-1">
+                  <div className="absolute left-[18px] top-0 bottom-4 w-px bg-slate-200 dark:bg-slate-800/80 pointer-events-none" />
+                  {g3dItems.map((item) => {
+                    const isActive = location.pathname === item.to;
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={onClose}
+                        className={cn(
+                          "flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-[12px] font-bold relative overflow-hidden",
+                          isActive
+                            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-white/5"
+                            : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/20"
+                        )}
+                      >
+                        <item.icon size={14} className={isActive ? "text-orange-500" : "text-slate-400"} />
+                        <span className="truncate">{item.label}</span>
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 3. SECCIÓN: IPTV XTV */}
+          {canShowXtv && (
+            <div className="flex flex-col">
+              <button
+                type="button"
+                onClick={() => setIsXtvExpanded(!isXtvExpanded)}
+                className={cn(
+                  "w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-150 group relative overflow-hidden text-left cursor-pointer select-none",
+                  isXtvActive
+                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold shadow-xs border border-blue-500/20" 
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <Tv 
+                    size={18} 
+                    className={cn(
+                      "transition-colors duration-150",
+                      isXtvActive ? "text-blue-500 scale-105" : "text-slate-400 group-hover:text-blue-500"
+                    )} 
+                  />
+                  <span className="text-[13px] font-bold tracking-tight">IPTV XTV</span>
+                </div>
+                
+                <div className="p-1 rounded-lg transition-colors">
+                  <ChevronDown 
+                    size={15} 
+                    className={cn(
+                      "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform duration-300 ease-out",
+                      isXtvExpanded ? "rotate-180 text-blue-500" : ""
+                    )}
+                  />
+                </div>
+              </button>
+
+              {isXtvExpanded && (
+                <div className="relative pl-7 pr-1 py-1 flex flex-col gap-1">
+                  <div className="absolute left-[18px] top-0 bottom-4 w-px bg-slate-200 dark:bg-slate-800/80 pointer-events-none" />
+                  {xtvItems.map((item) => {
+                    const isActive = location.pathname + location.search === item.to;
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={onClose}
+                        className={cn(
+                          "flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-[12px] font-bold relative overflow-hidden",
+                          isActive
+                            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-white/5"
+                            : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/20"
+                        )}
+                      >
+                        <item.icon size={14} className={isActive ? "text-blue-500" : "text-slate-400"} />
+                        <span className="truncate">{item.label}</span>
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 4. SECCIÓN: APLICACIONES & HERRAMIENTAS */}
+          {canShowApps && (
+            <div className="flex flex-col">
+              <button
+                type="button"
+                onClick={() => setIsAppsExpanded(!isAppsExpanded)}
+                className={cn(
+                  "w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-150 group relative overflow-hidden text-left cursor-pointer select-none",
+                  isAppsActive
+                    ? "bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold shadow-xs border border-teal-500/20" 
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
+                )}
+              >
+                <div className="flex items-center gap-3">
                   <LayoutGrid 
                     size={18} 
                     className={cn(
-                      "transition-colors duration-150", 
-                      location.pathname === '/apps' ? "scale-110 text-primary drop-shadow-[0_0_8px_rgba(0,194,255,0.4)]" : "text-slate-400 group-hover:text-primary"
+                      "transition-colors duration-150",
+                      isAppsActive ? "text-teal-500 scale-105" : "text-slate-400 group-hover:text-teal-500"
                     )} 
                   />
                   <span className="text-[13px] font-bold tracking-tight">Aplicaciones</span>
-                </NavLink>
+                </div>
 
-                <button
-                  onClick={() => setIsAppsExpanded(!isAppsExpanded)}
-                  className="p-2.5 mr-1 hover:bg-slate-200/50 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
-                >
+                <div className="p-1 rounded-lg transition-colors">
                   <ChevronDown 
-                    size={16} 
+                    size={15} 
                     className={cn(
-                      "text-slate-400 group-hover:text-slate-600 transition-transform duration-300 ease-out",
-                      isAppsExpanded ? "rotate-180" : ""
+                      "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform duration-300 ease-out",
+                      isAppsExpanded ? "rotate-180 text-teal-500" : ""
                     )}
                   />
-                </button>
-              </div>
+                </div>
+              </button>
 
-              {/* Items Hijos - Aplicaciones */}
               {isAppsExpanded && (
                 <div className="relative pl-7 pr-1 py-1 flex flex-col gap-1">
-                  {/* Vertical tree branch guide line */}
                   <div className="absolute left-[18px] top-0 bottom-4 w-px bg-slate-200 dark:bg-slate-800/80 pointer-events-none" />
-
-                  {/* 1. Panel de Aplicaciones */}
+                  
                   {hasPermission('Admin.VistaGeneral.Ver') && (
                     <NavLink
                       to="/apps"
@@ -358,12 +406,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                           : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/20"
                       )}
                     >
-                      <div className="size-1.5 rounded-full bg-slate-400 shrink-0" />
-                      <span className="truncate">Acceder</span>
+                      <LayoutGrid size={14} className={location.pathname === '/apps' ? "text-teal-500" : "text-slate-400"} />
+                      <span className="truncate">Panel de Apps</span>
                     </NavLink>
                   )}
 
-                  {/* 2. Simulador Chop */}
                   {hasPermission(PERMISSIONS.STOCK.ACCEDER_CATALOGO.id) && (
                     <NavLink
                       to="/simulador"
@@ -375,10 +422,72 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                           : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/20"
                       )}
                     >
-                      <div className="size-1.5 rounded-full bg-cyan-500 shrink-0 animate-pulse" />
-                      <span className="truncate">Simulador Chop</span>
+                      <Rotate3d size={14} className={location.pathname === '/simulador' ? "text-cyan-500" : "text-slate-400"} />
+                      <span className="truncate">Simulador Chop 3D</span>
                     </NavLink>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 5. SECCIÓN: SISTEMA & AUDITORÍA */}
+          {canShowSystem && (
+            <div className="flex flex-col">
+              <button
+                type="button"
+                onClick={() => setIsSystemExpanded(!isSystemExpanded)}
+                className={cn(
+                  "w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-150 group relative overflow-hidden text-left cursor-pointer select-none",
+                  isSystemActive
+                    ? "bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-bold shadow-xs border border-slate-300 dark:border-slate-700" 
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <Bug 
+                    size={18} 
+                    className={cn(
+                      "transition-colors duration-150",
+                      isSystemActive ? "text-primary scale-105" : "text-slate-400 group-hover:text-primary"
+                    )} 
+                  />
+                  <span className="text-[13px] font-bold tracking-tight">Sistema</span>
+                </div>
+
+                <div className="p-1 rounded-lg transition-colors">
+                  <ChevronDown 
+                    size={15} 
+                    className={cn(
+                      "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform duration-300 ease-out",
+                      isSystemExpanded ? "rotate-180 text-primary" : ""
+                    )}
+                  />
+                </div>
+              </button>
+
+              {isSystemExpanded && (
+                <div className="relative pl-7 pr-1 py-1 flex flex-col gap-1">
+                  <div className="absolute left-[18px] top-0 bottom-4 w-px bg-slate-200 dark:bg-slate-800/80 pointer-events-none" />
+                  {systemItems.map((item) => {
+                    const isActive = location.pathname === item.to;
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={onClose}
+                        className={cn(
+                          "flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-[12px] font-bold relative overflow-hidden",
+                          isActive
+                            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200 dark:border-white/5"
+                            : "text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/20"
+                        )}
+                      >
+                        <item.icon size={14} className={isActive ? "text-primary" : "text-slate-400"} />
+                        <span className="truncate">{item.label}</span>
+                      </NavLink>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -429,6 +538,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
+              {/* Selector Modo Claro / Oscuro */}
+              <ThemeToggle className="size-7" />
+
               {/* Botón Configuración */}
               <NavLink 
                 to="/configuracion" 

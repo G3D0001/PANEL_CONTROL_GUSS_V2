@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const userId = panelSession.id;
 
-        // 1. Obtener excepciones/overrides del usuario y rol del perfil local
+        // 1. Obtener datos del usuario desde perfiles_locales
         const { data: profileData } = await supabase
           .from('perfiles_locales')
           .select('*')
@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (profileData) {
           setUserProfile(profileData);
           
-          // Registrar última actividad de forma silenciosa para el panel de limpieza
+          // Registrar última actividad de forma silenciosa
           const nowIso = new Date().toISOString();
           const datos_adicionales = profileData.datos_adicionales || {};
           const updatedAdicionales = { ...datos_adicionales, last_active_at: nowIso };
@@ -101,111 +101,108 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        const userOverrides = profileData?.permisos || [];
+        // Obtener rol del usuario
+        const userAssignedRole = profileData?.rol || panelSession.rol || 'VENDEDOR';
+        const userRolesList = [userAssignedRole];
 
-        const mergePermissions = (baseRolePerms: string[], overrides: string[]): string[] => {
-          const overridesMap = new Map<string, { negated: boolean }>();
-          overrides.forEach(p => {
-            const isNeg = p.startsWith('-');
-            let cleanP = isNeg ? p.slice(1) : p;
-            if (cleanP.endsWith(':completo')) {
-              cleanP = cleanP.replace(':completo', '');
-            }
-            overridesMap.set(cleanP.toLowerCase(), { negated: isNeg });
+        // Obtener roles y su herencia desde seguridad_roles
+        const { data: dbRolesData } = await supabase
+          .from('seguridad_roles')
+          .select('*');
+
+        const rolesMap = new Map<string, { rol_padre?: string | null; permisos: string[] }>();
+        if (dbRolesData && dbRolesData.length > 0) {
+          dbRolesData.forEach((r: any) => {
+            const rawPerms = Array.isArray(r.permisos) ? r.permisos : (typeof r.permisos === 'string' ? JSON.parse(r.permisos) : []);
+            rolesMap.set(r.id, {
+              rol_padre: r.rol_padre,
+              permisos: rawPerms
+            });
           });
-
-          const filteredBase = baseRolePerms.filter(p => {
-            const isNeg = p.startsWith('-');
-            let cleanP = isNeg ? p.slice(1) : p;
-            if (cleanP.endsWith(':completo')) {
-              cleanP = cleanP.replace(':completo', '');
-            }
-            return !overridesMap.has(cleanP.toLowerCase());
-          });
-
-          return [...filteredBase, ...overrides];
-        };
-        
-        // 2. Consulta de roles asignados en g3d_usuarios_roles_asignacion
-        const { data: rolesAsg, error: rolesAsgError } = await supabase
-          .from('g3d_usuarios_roles_asignacion')
-          .select('rol_id')
-          .eq('usuario_id', userId);
-
-        if (rolesAsgError) throw rolesAsgError;
-
-        const userRoles: string[] = (rolesAsg || []).map((row: any) => row.rol_id).filter(Boolean);
-        if (userRoles.length === 0) {
-          const currentRol = profileData?.rol || panelSession.rol || 'IPTV CLIENTES';
-          userRoles.push(currentRol);
         }
 
-        // Obtener todos los permisos asignados a roles desde la base de datos
-        const { data: dbRolePerms } = await supabase
-          .from('g3d_roles_permisos')
-          .select('rol_id, permiso_id');
+        // Helper recursivo para resolver permisos con herencia
+        const getInheritedRolePermissions = (roleId: string, visited: Set<string> = new Set()): string[] => {
+          if (!roleId || visited.has(roleId)) return [];
+          visited.add(roleId);
 
-        // Obtener herencia de roles desde configuracion_sistema (ID 1)
-        const { data: sysConfig } = await supabase
-          .from('configuracion_sistema')
-          .select('role_inheritance')
-          .maybeSingle();
-
-        const inheritance = sysConfig?.role_inheritance || {};
-
-        // Helper recursivo para resolver permisos heredados del rol padre
-        const getRolePermissionsRecursive = (roleName: string, visited: Set<string> = new Set()): string[] => {
-          if (visited.has(roleName)) return [];
-          visited.add(roleName);
-
-          const explicitPerms = (dbRolePerms || [])
-            .filter((p: any) => p.rol_id === roleName && p.permiso_id)
-            .map((p: any) => p.permiso_id);
-
-          const parentRole = inheritance[roleName];
-          if (parentRole && parentRole !== roleName) {
-            const parentPerms = getRolePermissionsRecursive(parentRole, visited);
-            const mergedPerms = [...explicitPerms];
-            const childConfiguredBases = new Set(
-              explicitPerms.map(p => p.replace(/^-/, '').replace(/:completo$/, ''))
-            );
-            
-            parentPerms.forEach(p => {
-              const baseP = p.replace(/^-/, '').replace(/:completo$/, '');
-              if (!childConfiguredBases.has(baseP)) {
-                mergedPerms.push(p);
-              }
-            });
-            return mergedPerms;
+          const roleObj = rolesMap.get(roleId);
+          if (!roleObj) {
+            // Si el rol es Administrador, tiene Admin.* por defecto
+            if (roleId.toLowerCase() === 'administrador' || roleId.toLowerCase() === 'admin') {
+              return ['Admin.*'];
+            }
+            return [];
           }
-          
-          return explicitPerms;
+
+          const currentPerms = roleObj.permisos || [];
+          if (roleObj.rol_padre) {
+            const parentPerms = getInheritedRolePermissions(roleObj.rol_padre, visited);
+            return Array.from(new Set([...parentPerms, ...currentPerms]));
+          }
+
+          return currentPerms;
         };
 
-        // Unificar todos los permisos de todos los roles asignados al usuario
-        let basePermissions: string[] = [];
-        const seenBases = new Set<string>();
-        userRoles.forEach(r => {
-          const rolePerms = getRolePermissionsRecursive(r);
-          rolePerms.forEach(p => {
-            const baseP = p.replace(/^-/, '').replace(/:completo$/, '').toLowerCase();
-            if (!seenBases.has(baseP)) {
-              basePermissions.push(p);
-              seenBases.add(baseP);
-            }
-          });
+        // Permisos base obtenidos del rol y su jerarquía
+        const baseRolePerms = getInheritedRolePermissions(userAssignedRole);
+
+        // Permisos extra y permisos denegados del usuario
+        const userExtra = Array.isArray(profileData?.permisos_extra) 
+          ? profileData.permisos_extra 
+          : (typeof profileData?.permisos_extra === 'string' ? JSON.parse(profileData.permisos_extra) : []);
+
+        const userDenied = Array.isArray(profileData?.permisos_denegados) 
+          ? profileData.permisos_denegados 
+          : (typeof profileData?.permisos_denegados === 'string' ? JSON.parse(profileData.permisos_denegados) : []);
+
+        // Compatibilidad con columna legacy "permisos" si no hay permisos_extra
+        const legacyPerms = Array.isArray(profileData?.permisos) ? profileData.permisos : [];
+
+        // Permisos unificados con negaciones explícitas marcadas con prefijo "-"
+        const effectivePermsSet = new Set<string>();
+
+        // 1. Agregar permisos del rol y de herencia
+        baseRolePerms.forEach(p => effectivePermsSet.add(p));
+
+        // 2. Agregar permisos extra
+        userExtra.forEach((p: string) => effectivePermsSet.add(p));
+        legacyPerms.forEach((p: string) => {
+          if (!p.startsWith('-')) effectivePermsSet.add(p);
         });
 
-        const merged = mergePermissions(basePermissions, userOverrides);
-        setDbUserRoles(userRoles);
-        setDbUserPermissions(merged);
+        // 3. Aplicar denegaciones (tienen prioridad absoluta)
+        const finalPermissions: string[] = [];
+        const deniedSet = new Set(userDenied.map((p: string) => p.toLowerCase().replace(/^-/, '')));
+
+        // Agregar también las negaciones legadas
+        legacyPerms.forEach((p: string) => {
+          if (p.startsWith('-')) {
+            deniedSet.add(p.slice(1).toLowerCase());
+          }
+        });
+
+        effectivePermsSet.forEach(p => {
+          const clean = p.toLowerCase();
+          if (!deniedSet.has(clean)) {
+            finalPermissions.push(p);
+          }
+        });
+
+        // Agregar las negaciones explícitas al array de permisos como -permiso
+        deniedSet.forEach(d => {
+          finalPermissions.push(`-${d}`);
+        });
+
+        setDbUserRoles(userRolesList);
+        setDbUserPermissions(finalPermissions);
         setDbPermissionsLoaded(true);
       } catch (e) {
         console.warn("[AuthContext] Error consultando rol unificado en Supabase, usando fallback local:", e);
-        const currentRol = panelSession.rol || 'IPTV CLIENTES';
+        const currentRol = panelSession.rol || 'VENDEDOR';
         setDbUserRoles([currentRol]);
         
-        let basePermissions: string[] = [];
+        let basePermissions: string[] = currentRol === 'Administrador' ? ['Admin.*'] : [];
         const savedRoleConfigs = localStorage.getItem('iptv_role_configs');
         if (savedRoleConfigs) {
           try {
@@ -246,30 +243,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           loadUserRolesAndPerms();
         }
       )
-      // Escuchar cambios en g3d_usuarios_roles_asignacion para el usuario logueado
+      // Escuchar cambios globales en seguridad_roles
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'g3d_usuarios_roles_asignacion',
-          filter: `usuario_id=eq.${userId}`
+          table: 'seguridad_roles'
         },
         (payload) => {
-          console.log("[Realtime Auth] Detectado cambio en asignaciones de rol:", payload);
-          loadUserRolesAndPerms();
-        }
-      )
-      // Escuchar cambios generales en los permisos de los roles
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'g3d_roles_permisos'
-        },
-        (payload) => {
-          console.log("[Realtime Auth] Detectado cambio global en g3d_roles_permisos, recargando...");
+          console.log("[Realtime Auth] Detectado cambio global en seguridad_roles, recargando...");
           loadUserRolesAndPerms();
         }
       )
@@ -345,6 +328,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
 
       if (data) {
+        // Verificar si el usuario está bloqueado o inactivo
+        if (data.activo === false || data.bloqueado === true || data.estado === 'bloqueado') {
+          return {
+            success: false,
+            error: '⛔ Acceso denegado: Este usuario ha sido bloqueado o desactivado por el Administrador.'
+          };
+        }
+
         const customSession = {
           id: data.id || `profile-id-${data.email}`,
           usuario: data.email,
@@ -453,6 +444,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userPermissions = useMemo(() => dbPermissionsLoaded ? dbUserPermissions : (userRole === 'Admin' ? ['*'] : ['IPTV.Ver']), [dbPermissionsLoaded, dbUserPermissions, userRole]);
 
   const hasPermission = useCallback((node: string, actionType: 'ver' | 'interactuar' = 'ver'): boolean => {
+    // Si el usuario actual está bloqueado o inactivo por el administrador, revocar todos los accesos
+    if (userProfile && (userProfile.activo === false || userProfile.bloqueado === true || userProfile.estado === 'bloqueado')) {
+      return false;
+    }
+
     const activeRole = simulatedRole || userRole;
     if (!activeRole) return false;
     
