@@ -556,25 +556,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const userRole = useMemo(() => panelSession
     ? (() => {
-        const r = String(panelSession.rol || '').trim().toLowerCase();
-        if (r === 'admin' || r === 'administrador' || r === 'administrador total' || r === 'superuser') {
+        const r = String(panelSession.rol || '').trim();
+        const lower = r.toLowerCase();
+        if (lower === 'admin' || lower === 'administrador' || lower === 'administrador total' || lower === 'superuser') {
           return 'Admin';
         }
-        if (r === 'iptv_socios' || r === 'iptv socios' || r === 'iptv socio' || r === 'socio') {
-          return 'IPTV SOCIOS';
-        }
-        if (r === 'iptv_vendedores' || r === 'iptv vendedores' || r === 'iptv vendedor' || r === 'vendedor') {
-          return 'IPTV VENDEDORES';
-        }
-        if (r === 'iptv_clientes' || r === 'iptv clientes' || r === 'iptv cliente' || r === 'cliente') {
-          return 'IPTV CLIENTES';
-        }
-        return panelSession.rol || 'IPTV CLIENTES';
+        return r || 'VENDEDOR';
       })()
     : null, [panelSession]);
 
   const userRoles = useMemo(() => dbUserRoles.length > 0 ? dbUserRoles : (userRole ? [userRole] : []), [dbUserRoles, userRole]);
-  const userPermissions = useMemo(() => dbPermissionsLoaded ? dbUserPermissions : (userRole === 'Admin' ? ['*'] : ['IPTV.Ver']), [dbPermissionsLoaded, dbUserPermissions, userRole]);
+  const userPermissions = useMemo(() => dbPermissionsLoaded ? dbUserPermissions : (userRole === 'Admin' ? ['*'] : []), [dbPermissionsLoaded, dbUserPermissions, userRole]);
 
   const hasPermission = useCallback((node: string, actionType: 'ver' | 'interactuar' = 'ver'): boolean => {
     // Si el usuario actual está bloqueado o inactivo por el administrador, revocar todos los accesos
@@ -588,7 +580,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const normalizedRole = activeRole.toUpperCase();
     
     // Si es Administrador total, tiene acceso completo a todo (lectura y escritura), salvo que esté explícitamente negado
-    const isAdminRole = normalizedRole === 'ADMIN' || normalizedRole === 'ADMINISTRADOR' || normalizedRole === 'SUPERUSER';
+    const isAdminRole = normalizedRole === 'ADMIN' || normalizedRole === 'ADMINISTRADOR' || normalizedRole === 'SUPERUSER' || userRoles.some(r => r.toUpperCase() === 'ADMIN' || r.toUpperCase() === 'ADMINISTRADOR');
 
     // Cargar permisos desde DB o fallback local
     let currentPermissions: string[] = [];
@@ -606,50 +598,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (e) {
           console.error(e);
         }
-      } else {
-        const defaultConfigs = [
-          { id: 'Administrador', permisos: ['Admin.*', 'Stock.*', 'Pedidos.*', 'Produccion.*', 'Logistica.*', 'Iptv.*', 'Seguridad.*'] },
-          { id: 'IPTV SOCIOS', permisos: ['Iptv.InicioResendores.Ingresar', 'Iptv.InicioResendores.VerYInteractuar', 'Iptv.Finanzas.Ver', 'Iptv.Branding.Ver', 'Iptv.Renovaciones.Acceder', 'Iptv.AyudaCreditos.Acceder'] },
-          { id: 'IPTV VENDEDORES', permisos: ['Iptv.InicioResendores.Ingresar', 'Iptv.InicioResendores.VerYInteractuar', 'Iptv.Clientes.Ver', 'Iptv.Mensajes.Ver', 'Iptv.Solicitudes.Ver', 'Iptv.CrearDirecto.Acceder', 'Iptv.SolicitarActivacion.Acceder'] },
-          { id: 'IPTV CLIENTES', permisos: ['Iptv.InicioResendores.Ingresar', 'Iptv.InicioResendores.VerYInteractuar', 'Iptv.Clientes.Ver', 'Iptv.Solicitudes.Ver'] }
-        ];
-        localStorage.setItem('iptv_role_configs', JSON.stringify(defaultConfigs));
-        const config = defaultConfigs.find((r: any) => r.id.toUpperCase() === normalizedRole);
-        if (config) {
-          currentPermissions = config.permisos;
-        }
+      } else if (isAdminRole) {
+        currentPermissions = ['*'];
       }
     }
 
-    // Normalizar permisos para incluir alias de compatibilidad bidireccional
+    // Normalizar permisos para incluir alias de compatibilidad bidireccional (evita fallos por diferencias de tipeo)
     const normalizedPermissions = [...currentPermissions];
-    const hasOldIptv = currentPermissions.some((p: string) => p.toLowerCase() === 'iptv.vistageneral.ver' || p.toLowerCase() === 'iptv.vistageneral.ver:completo');
-    const hasNewIptv = currentPermissions.some((p: string) => p.toLowerCase() === 'iptv.inicioresendores.ingresar' || p.toLowerCase() === 'iptv.inicioresendores.ingresar:completo');
-    const hasVerInteract = currentPermissions.some((p: string) => p.toLowerCase() === 'iptv.inicioresendores.veryinteractuar' || p.toLowerCase() === 'iptv.inicioresendores.veryinteractuar:completo');
+    
+    // Si tiene cualquier permiso de IPTV, se le otorga acceso al ingreso del módulo XTV
+    const hasAnyIptvChild = currentPermissions.some((p: string) => {
+      if (p.startsWith('-')) return false;
+      const lp = p.toLowerCase();
+      return lp.startsWith('iptv.') || lp === '*';
+    });
 
-    if (hasOldIptv && !hasNewIptv) {
-      normalizedPermissions.push('Iptv.InicioResendores.Ingresar');
+    if (hasAnyIptvChild) {
+      if (!normalizedPermissions.some(p => p.toLowerCase() === 'iptv.inicioresendores.ingresar')) {
+        normalizedPermissions.push('Iptv.InicioResendores.Ingresar');
+      }
+      if (!normalizedPermissions.some(p => p.toLowerCase() === 'iptv.iniciorevendedores.ingresar')) {
+        normalizedPermissions.push('Iptv.InicioRevendedores.Ingresar');
+      }
+      if (!normalizedPermissions.some(p => p.toLowerCase() === 'inicio.xtv.ver')) {
+        normalizedPermissions.push('Inicio.Xtv.Ver');
+      }
+      if (!normalizedPermissions.some(p => p.toLowerCase() === 'inicio.xtv.acceder')) {
+        normalizedPermissions.push('Inicio.Xtv.Acceder');
+      }
     }
-    if (hasNewIptv && !hasOldIptv) {
-      normalizedPermissions.push('Iptv.VistaGeneral.Ver');
-    }
-    if (hasVerInteract && !hasNewIptv) {
-      normalizedPermissions.push('Iptv.InicioResendores.Ingresar');
+
+    // Si tiene cualquier permiso de G3D / Stock / Pedidos / Logística, se le otorga acceso a ver e ingresar a G3D
+    const hasAnyG3dChild = currentPermissions.some((p: string) => {
+      if (p.startsWith('-')) return false;
+      const lp = p.toLowerCase();
+      return lp.startsWith('g3d.') || lp.startsWith('stock.') || lp.startsWith('pedidos.') || lp.startsWith('logistica.') || lp === '*';
+    });
+
+    if (hasAnyG3dChild) {
+      if (!normalizedPermissions.some(p => p.toLowerCase() === 'inicio.g3d.ver')) {
+        normalizedPermissions.push('Inicio.G3d.Ver');
+      }
+      if (!normalizedPermissions.some(p => p.toLowerCase() === 'inicio.g3d.acceder')) {
+        normalizedPermissions.push('Inicio.G3d.Acceder');
+      }
     }
 
     const cleanNode = node.toLowerCase();
 
-    // Determinar si el permiso buscado está otorgado explícita y positivamente en normalizedPermissions
-    const isExplicitlyGranted = normalizedPermissions.some((p: string) => {
-      if (p.startsWith('-')) return false;
-      let cleanP = p.toLowerCase();
-      if (cleanP.endsWith(':completo')) {
-        cleanP = cleanP.replace(':completo', '');
-      }
-      return cleanP === cleanNode;
-    });
-
-    // 1. CHEQUEAR NEGACIÓN DIRECTA (Sólo coincidencias exactas para permitir que el switch Admin se apague sin afectar a los específicos)
+    // 1. CHEQUEAR NEGACIÓN DIRECTA (Prioridad absoluta de bloqueo)
     const isNegated = normalizedPermissions.some((p: string) => {
       if (!p.startsWith('-')) return false;
       let cleanPerm = p.slice(1).toLowerCase();
@@ -659,19 +656,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cleanPerm = cleanPerm.replace(':completo', '');
       }
 
-      // Si es una negación específica exacta (ej: -iptv.inicioresendores.ingresar)
+      // Equivalencias de negación
+      if (cleanPerm === 'iptv.inicioresendores.ingresar' || cleanPerm === 'iptv.iniciorevendedores.ingresar') {
+        if (cleanNode === 'iptv.inicioresendores.ingresar' || cleanNode === 'iptv.iniciorevendedores.ingresar' || cleanNode === 'inicio.xtv.ver' || cleanNode === 'inicio.xtv.acceder') {
+          return true;
+        }
+      }
+
       return cleanNode === cleanPerm;
     });
 
     if (isNegated) return false;
 
     // Si requiere interactuar y el rol es Admin, se le permite siempre que no esté negado
-    if (actionType === 'interactuar' && isAdminRole) {
+    if (isAdminRole) {
       return true;
     }
 
-    // 2. CHEQUEAR PERMISOS POSITIVOS
+    // 2. CHEQUEAR PERMISOS POSITIVOS Y COMODINES
     const isGranted = normalizedPermissions.some((p: string) => {
+      if (p.startsWith('-')) return false;
       let cleanPerm = p.toLowerCase();
       let isPermissionComplete = false;
 
@@ -686,19 +690,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const matchesBranch = prefix ? cleanNode.startsWith(prefix) : true;
         
         if (matchesBranch) {
-          // Un comodín otorga acceso completo (interactuar) por defecto
           return true;
         }
+      }
+
+      // Equivalencias de alias para entrada a XTV
+      if (
+        (cleanNode === 'iptv.inicioresendores.ingresar' || cleanNode === 'iptv.iniciorevendedores.ingresar' || cleanNode === 'inicio.xtv.ver' || cleanNode === 'inicio.xtv.acceder') &&
+        (cleanPerm === 'iptv.inicioresendores.ingresar' || cleanPerm === 'iptv.iniciorevendedores.ingresar' || cleanPerm === 'inicio.xtv.ver' || cleanPerm === 'inicio.xtv.acceder')
+      ) {
+        return true;
+      }
+
+      if (
+        (cleanNode === 'iptv.inicioresendores.veryinteractuar' || cleanNode === 'iptv.iniciorevendedores.veryinteractuar') &&
+        (cleanPerm === 'iptv.inicioresendores.veryinteractuar' || cleanPerm === 'iptv.iniciorevendedores.veryinteractuar')
+      ) {
+        return true;
       }
 
       const isExactMatch = cleanNode === cleanPerm;
 
       if (isExactMatch) {
         if (actionType === 'interactuar') {
-          // Si requiere interactuar, el permiso debe estar guardado como completo
           return isPermissionComplete;
         }
-        // Si requiere solo ver, cualquier coincidencia exacta (completo o solo ver) es suficiente
         return true;
       }
 
@@ -707,13 +723,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (isGranted) return true;
 
-    // 3. FALLBACK PARA ADMINISTRADOR TOTAL (si no está explícitamente negado)
-    if (isAdminRole) {
-      return true;
-    }
-
     return false;
-  }, [simulatedRole, userRole, dbPermissionsLoaded, dbUserPermissions]);
+  }, [simulatedRole, userRole, userRoles, dbPermissionsLoaded, dbUserPermissions, userProfile]);
 
   // Memoizar el value evita re-renders innecesarios de todos los consumidores
   // de useAuth() cuando el provider se renderiza sin que cambie el estado de auth.

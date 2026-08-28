@@ -877,10 +877,10 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged, initialSelect
       </div>
 
       {/* 3. CONTENEDOR PRINCIPAL: SIDEBAR + PANEL DE PERMISOS */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm dark:shadow-2xl flex flex-col md:flex-row min-h-[750px] transition-colors">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm dark:shadow-2xl flex flex-col md:flex-row transition-colors">
         
         {/* SIDEBAR LATERAL: ROLES Y USUARIOS */}
-        <div className="w-full md:w-80 shrink-0 bg-slate-50/80 dark:bg-slate-950/60 border-r border-slate-200 dark:border-slate-800 p-4 flex flex-col gap-5 overflow-y-auto max-h-[850px]">
+        <div className="w-full md:w-80 shrink-0 bg-slate-50/80 dark:bg-slate-950/60 border-r border-slate-200 dark:border-slate-800 p-4 flex flex-col gap-5">
           
           {/* SECCIÓN ROLES MAESTROS */}
           <div className="space-y-2.5">
@@ -1082,7 +1082,7 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged, initialSelect
         </div>
 
         {/* CONTENIDO PRINCIPAL: PERMISOS ORGANIZADOS POR FACCIONES */}
-        <div className="flex-1 p-5 flex flex-col gap-6 overflow-y-auto max-h-[850px]">
+        <div className="flex-1 p-5 md:p-6 flex flex-col gap-6">
           
           {/* BARRA DE INFORMACIÓN DEL SUJETO SELECCIONADO */}
           <div className="p-4 bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-inner">
@@ -1161,7 +1161,7 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged, initialSelect
           </div>
 
           {/* LISTA DE FACCIONES EN ACORDEÓN */}
-          <div className="space-y-4">
+          <div className="space-y-4 pb-12">
             {filteredFactions.map(faction => {
               const isExpanded = expandedFactions[faction.key] ?? false;
               const activeInFaction = faction.items.filter(i => getPermissionStatus(i.id).effectiveActive).length;

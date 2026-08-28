@@ -55,6 +55,13 @@ Eres un Arquitecto de Software y Desarrollador Full Stack experto. Mi objetivo e
 - **Storage:** Usamos el Storage Bucket `public_assets` en Supabase para logos y fotos.
 
 **Autorreflejo Reciente:**
+- **Auditoría Integral y Unificación del Sistema de Permisos RBAC (`AuthContext.tsx` / `App.tsx` / `XtvUnifiedView.tsx` / `HomeView.tsx` / `Sidebar.tsx`)**:
+  1) **Resolución de Alias y Coherencia de Permisos**: Se unificaron e interconectaron de forma bidireccional los alias de ingreso a XTV (`Iptv.InicioRevendedores.Ingresar` / `Iptv.InicioResendores.Ingresar` / `Inicio.Xtv.Acceder` / `Inicio.Xtv.Ver` / `Iptv.*`).
+  2) **Desbloqueo de Rutas Protegidas (`ProtectedRoute` en `App.tsx`)**: `ProtectedRoute` ahora admite arreglos de permisos alternativos, permitiendo el ingreso al módulo `/xtv` si el usuario cuenta con el permiso de entrada o cualquiera de sus herramientas asociadas.
+  3) **Soporte Dinámico de Roles sin Forzar Valores Hardcodeados**: Se eliminó la conversión forzada de roles desconocidos a valores por defecto con permisos IPTV automáticos en `AuthContext.tsx`, garantizando que cada usuario reciba con precisión únicamente los permisos de sus roles asignados y sus excepciones extra/denegadas reales desde Supabase.
+- **Optimización de Espacio y Eliminación de Capas/Scrolls Anidados en Permisos RBAC (`PermissionsCasbinTab.tsx`)**:
+  1) **Eliminación de Capas Bloqueantes**: Se eliminaron las restricciones rígidas de `max-h-[850px]` y `overflow-y-auto` anidadas que encerraban la lista de permisos dentro de otra sub-caja con scroll interno, provocando que los últimos permisos quedaran cortados o tapados.
+  2) **Visualización Fluida al 100%**: Toda la lista de permisos ahora fluye naturalmente con el scroll principal de la aplicación e incorpora espaciado inferior (`pb-12`), garantizando que cada botón, switch toggle y acción de permiso (+Extra, -Bloquear, Directo, Heredado) sea 100% visible e interactuable.
 - **Resolución de Transición Inmediata al Completar Perfil y Optimización de Imágenes (`ProfileCompletionOverlay.tsx` / `AuthContext.tsx` / `App.tsx`)**:
   1) **Transición Inmediata de Pantalla**: Se sincronizó la actualización de estado de React (`setUserProfile`, `updateUserProfileLocally`) directamente tras guardar los datos del perfil obligatorio, eliminando la retención en la pantalla de bienvenida.
   2) **Procesamiento de Imágenes con Canvas (Regla #21)**: La subida de foto de perfil ahora se comprime y procesa en Base64 de forma 100% local e instantánea, eliminando bloqueos o dependencias de almacenamiento de Supabase.

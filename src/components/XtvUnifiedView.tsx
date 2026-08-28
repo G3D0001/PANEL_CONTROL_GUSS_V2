@@ -16,18 +16,27 @@ export default function XtvUnifiedView() {
     hasPermission('Iptv.Clientes.Ver') || 
     hasPermission('Iptv.Finanzas.Ver') || 
     hasPermission('Iptv.Branding.Ver') || 
-    userRole === 'Administrador' || 
-    userRole === 'IPTV SOCIOS' || 
-    userRole === 'G3D SOCIO';
+    hasPermission('Iptv.*') ||
+    userRole === 'Admin' ||
+    userRole === 'Administrador';
 
   const canAccessPanel = 
+    hasPermission('Iptv.InicioRevendedores.Ingresar') ||
     hasPermission('Iptv.InicioResendores.Ingresar') || 
     hasPermission('Iptv.InicioResendores.VerYInteractuar') || 
+    hasPermission('Iptv.InicioRevendedores.VerYInteractuar') || 
+    hasPermission('Inicio.Xtv.Acceder') ||
+    hasPermission('Inicio.Xtv.Ver') ||
+    hasPermission('Iptv.CrearDirecto.Ver') ||
+    hasPermission('Iptv.SolicitarActivacion.Ver') ||
+    hasPermission('Iptv.Renovaciones.Ver') ||
+    hasPermission('Iptv.Clientes.Ver') ||
     hasPermission('Iptv.Solicitudes.Ver') || 
-    userRole === 'Administrador' || 
-    userRole === 'IPTV VENDEDORES' || 
-    userRole === 'IPTV CLIENTES' || 
-    userRole === 'G3D EMPLEADO';
+    hasPermission('Iptv.Finanzas.Ver') || 
+    hasPermission('Iptv.Tutoriales.Ver') || 
+    hasPermission('Iptv.*') ||
+    userRole === 'Admin' ||
+    userRole === 'Administrador';
 
   // Determine starting tab based on search param, path name, or permissions
   const [activeTab, setActiveTab] = useState<'panel' | 'central'>(() => {

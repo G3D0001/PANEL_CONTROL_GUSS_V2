@@ -49,13 +49,18 @@ function RouteFallback() {
 
 interface ProtectedRouteProps {
   element: React.ReactElement;
-  permission: string;
+  permission: string | string[];
 }
 
 function ProtectedRoute({ element, permission }: ProtectedRouteProps) {
   const { hasPermission } = useAuth();
 
-  if (!hasPermission(permission)) {
+  const isAllowed = Array.isArray(permission)
+    ? permission.some(p => hasPermission(p))
+    : hasPermission(permission);
+
+  if (!isAllowed) {
+    const displayPermission = Array.isArray(permission) ? permission[0] : permission;
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-6">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 max-w-md w-full text-center space-y-5 shadow-sm">
@@ -71,7 +76,7 @@ function ProtectedRoute({ element, permission }: ProtectedRouteProps) {
           <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 text-left">
             <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider mb-1">Permiso Requerido:</span>
             <code className="text-xs font-mono text-rose-600 dark:text-rose-400 font-bold bg-rose-50 dark:bg-rose-950/20 px-2 py-1 rounded-lg block overflow-x-auto select-all">
-              {permission}
+              {displayPermission}
             </code>
           </div>
           <button 
@@ -297,27 +302,27 @@ function AppContent() {
                <Suspense fallback={<RouteFallback />}>
                <Routes>
                 <Route path="/" element={<HomeView />} />
-                <Route path="/xtv" element={<ProtectedRoute permission="Iptv.InicioResendores.Ingresar" element={<XtvUnifiedView />} />} />
-                 <Route path="/xtv-panel" element={<Navigate to="/xtv" replace />} />
-                <Route path="/admin" element={<ProtectedRoute permission="Admin.VistaGeneral.Ver" element={<Dashboard />} />} />
-                <Route path="/tareas" element={<ProtectedRoute permission="Pedidos.VistaGeneral.Ver" element={<OrdersList />} />} />
-                <Route path="/pedidos" element={<ProtectedRoute permission="Pedidos.VistaGeneral.Ver" element={<OrdersList />} />} />
-                <Route path="/pedidos-v2" element={<ProtectedRoute permission="Pedidos.VistaGeneral.Ver" element={<OrdersCenterView2 />} />} />
-                <Route path="/pedidos/nuevo" element={<ProtectedRoute permission="Pedidos.VistaGeneral.Ver" element={<OrderForm />} />} />
-                <Route path="/pedidos/editar/:id" element={<ProtectedRoute permission="Pedidos.VistaGeneral.Ver" element={<OrderForm />} />} />
-                <Route path="/pedidos/:id" element={<ProtectedRoute permission="Pedidos.VistaGeneral.Ver" element={<OrderDetail />} />} />
-                <Route path="/historial" element={<ProtectedRoute permission="Admin.VistaGeneral.Ver" element={<HistoryView />} />} />
-                <Route path="/clasificacion" element={<ProtectedRoute permission="Admin.VistaGeneral.Ver" element={<ClassificationView />} />} />
-                <Route path="/mis-productos" element={<ProtectedRoute permission="Stock.VistaGeneral.Ver" element={<MisProductosView />} />} />
-                <Route path="/lista-precios" element={<ProtectedRoute permission="Stock.VistaGeneral.Ver" element={<PriceListView />} />} />
-                <Route path="/moderacion" element={<ProtectedRoute permission="Admin.VistaGeneral.Ver" element={<StoreModerationView />} />} />
-                <Route path="/proveedores" element={<ProtectedRoute permission="Stock.VistaGeneral.Ver" element={<SuppliersView />} />} />
-                <Route path="/revendedores" element={<ProtectedRoute permission="Admin.VistaGeneral.Ver" element={<SellersManager />} />} />
+                <Route path="/xtv" element={<ProtectedRoute permission={["Iptv.InicioRevendedores.Ingresar", "Iptv.InicioResendores.Ingresar", "Inicio.Xtv.Acceder", "Inicio.Xtv.Ver", "Iptv.*"]} element={<XtvUnifiedView />} />} />
+                <Route path="/xtv-panel" element={<Navigate to="/xtv" replace />} />
+                <Route path="/admin" element={<ProtectedRoute permission={["Admin.VistaGeneral.Ver", "Admin.*"]} element={<Dashboard />} />} />
+                <Route path="/tareas" element={<ProtectedRoute permission={["Pedidos.VistaGeneral.Ver", "Pedidos.*", "G3d.*"]} element={<OrdersList />} />} />
+                <Route path="/pedidos" element={<ProtectedRoute permission={["Pedidos.VistaGeneral.Ver", "Pedidos.*", "G3d.*"]} element={<OrdersList />} />} />
+                <Route path="/pedidos-v2" element={<ProtectedRoute permission={["Pedidos.VistaGeneral.Ver", "Pedidos.*", "G3d.*"]} element={<OrdersCenterView2 />} />} />
+                <Route path="/pedidos/nuevo" element={<ProtectedRoute permission={["Pedidos.VistaGeneral.Ver", "Pedidos.Crear", "Pedidos.*", "G3d.*"]} element={<OrderForm />} />} />
+                <Route path="/pedidos/editar/:id" element={<ProtectedRoute permission={["Pedidos.VistaGeneral.Ver", "Pedidos.Editar", "Pedidos.*", "G3d.*"]} element={<OrderForm />} />} />
+                <Route path="/pedidos/:id" element={<ProtectedRoute permission={["Pedidos.VistaGeneral.Ver", "Pedidos.*", "G3d.*"]} element={<OrderDetail />} />} />
+                <Route path="/historial" element={<ProtectedRoute permission={["Admin.VistaGeneral.Ver", "Seguridad.*", "Admin.*"]} element={<HistoryView />} />} />
+                <Route path="/clasificacion" element={<ProtectedRoute permission={["Admin.VistaGeneral.Ver", "Stock.*", "Admin.*"]} element={<ClassificationView />} />} />
+                <Route path="/mis-productos" element={<ProtectedRoute permission={["Stock.VistaGeneral.Ver", "Stock.*", "G3d.*"]} element={<MisProductosView />} />} />
+                <Route path="/lista-precios" element={<ProtectedRoute permission={["Stock.VistaGeneral.Ver", "Stock.*", "G3d.*"]} element={<PriceListView />} />} />
+                <Route path="/moderacion" element={<ProtectedRoute permission={["Admin.VistaGeneral.Ver", "Stock.*", "Admin.*"]} element={<StoreModerationView />} />} />
+                <Route path="/proveedores" element={<ProtectedRoute permission={["Stock.VistaGeneral.Ver", "Stock.*", "Admin.*"]} element={<SuppliersView />} />} />
+                <Route path="/revendedores" element={<ProtectedRoute permission={["Admin.VistaGeneral.Ver", "Admin.*"]} element={<SellersManager />} />} />
                 <Route path="/iptv-xtv" element={<Navigate to="/xtv" replace />} />
-                <Route path="/logistica" element={<ProtectedRoute permission="Logistica.VistaGeneral.Ver" element={<LogisticsCenterView />} />} />
-                <Route path="/apps" element={<ProtectedRoute permission="Admin.VistaGeneral.Ver" element={<AppsView />} />} />
-                <Route path="/reportes" element={<ProtectedRoute permission="Admin.VistaGeneral.Ver" element={<ReportsView />} />} />
-                <Route path="/configuracion" element={<ProtectedRoute permission="Admin.VistaGeneral.Ver" element={<SettingsView />} />} />
+                <Route path="/logistica" element={<ProtectedRoute permission={["Logistica.VistaGeneral.Ver", "Logistica.*", "G3d.*"]} element={<LogisticsCenterView />} />} />
+                <Route path="/apps" element={<ProtectedRoute permission={["Admin.VistaGeneral.Ver", "Config.Apps.Ver", "Utilidades.*", "Admin.*"]} element={<AppsView />} />} />
+                <Route path="/reportes" element={<ProtectedRoute permission={["Admin.VistaGeneral.Ver", "Admin.*"]} element={<ReportsView />} />} />
+                <Route path="/configuracion" element={<ProtectedRoute permission={["Admin.VistaGeneral.Ver", "Seguridad.*", "Config.*", "Admin.*"]} element={<SettingsView />} />} />
                 <Route path="/simulador" element={<ChopCustomizer />} />
                 <Route path="/customizer" element={<ChopCustomizer />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
