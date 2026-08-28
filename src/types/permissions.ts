@@ -7,6 +7,8 @@ export const PERMISSIONS = {
   ADMIN: {
     FULL_BRANCH: { id: 'Admin.*', title: 'Control Absoluto', description: 'Control absoluto.' },
     ACCEDER_ADMINISTRACION: { id: 'Admin.VistaGeneral.Ver', title: 'Acceder a Administración Central', description: 'Acceso a la vista de administración general de la plataforma.' },
+    GESTION_USUARIOS_VER: { id: 'Admin.Usuarios.Ver', title: 'Ver Gestión de Usuarios y Perfiles', description: 'Acceso a la consola de visualización y administración de perfiles personales, negocio G3D y negocio XTV.' },
+    GESTION_USUARIOS_EDITAR: { id: 'Admin.Usuarios.Editar', title: 'Editar Perfiles y Asignar Multi-Roles', description: 'Permite modificar datos de identidad personal, comercial G3D/XTV y asignar múltiples roles a los usuarios.' },
     CONSOLA_API_VER: { id: 'Admin.ConsolaAPI.Ver', title: 'Ver Consola y Logs XC', description: 'Ver Consola de Comandos y Logs de la API XC de IPTV' },
     INTEGRACION_XC_CONSOLA_ACCEDER: { id: 'Admin.IntegracionXC.Acceder', title: 'Acceder a Integración XC', description: 'Acceder a la Vista Previa del Cliente y Consola de Integración XC para Aprobar Líneas' },
     MODO_EDICION_INTERFAZ: { id: 'Admin.ModoEdicionInterface.Habilitar', title: 'Habilitar modo edición de interfaz', description: 'Permite habilitar el modo edición para personalizar en tiempo real los títulos, leyendas e íconos en el inicio.' },

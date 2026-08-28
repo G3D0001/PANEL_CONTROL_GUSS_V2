@@ -13,6 +13,7 @@ import { PERMISSIONS, getAllPermissionsList } from '../../types/permissions';
 interface PermissionsCasbinTabProps {
   currentUser: any;
   onDataChanged: () => Promise<void>;
+  initialSelectedUserId?: string;
 }
 
 type SelectionType = 'role' | 'user';
@@ -30,7 +31,7 @@ interface SeguridadRol {
   descripcion?: string;
 }
 
-export function PermissionsCasbinTab({ currentUser, onDataChanged }: PermissionsCasbinTabProps) {
+export function PermissionsCasbinTab({ currentUser, onDataChanged, initialSelectedUserId }: PermissionsCasbinTabProps) {
   const [loading, setLoading] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
 
@@ -42,18 +43,19 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged }: Permissions
   const [activeFactionTab, setActiveFactionTab] = useState<'ALL' | 'XTV' | 'G3D' | 'ADMIN'>('ALL');
 
   // Selección actual: Por Rol o por Usuario
-  const [selectionType, setSelectionType] = useState<SelectionType>('role');
+  const [selectionType, setSelectionType] = useState<SelectionType>(initialSelectedUserId ? 'user' : 'role');
   const [selectedRoleId, setSelectedRoleId] = useState<string>('REVENDEDOR');
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(initialSelectedUserId || null);
 
   // Permisos para el ROL seleccionado (solo directos del rol)
   const [roleDirectPerms, setRoleDirectPerms] = useState<string[]>([]);
   const [selectedRoleParent, setSelectedRoleParent] = useState<string>('');
 
-  // Configuración de permisos para el USUARIO seleccionado
+  // Configuración de permisos para el USUARIO seleccionado (Soporte Multi-Roles)
   const [userExtraPerms, setUserExtraPerms] = useState<string[]>([]);
   const [userDeniedPerms, setUserDeniedPerms] = useState<string[]>([]);
   const [userAssignedRole, setUserAssignedRole] = useState<string>('VENDEDOR');
+  const [userAssignedRoles, setUserAssignedRoles] = useState<string[]>(['VENDEDOR']);
 
   // Estado de acordeones desplegables por facción
   const [expandedFactions, setExpandedFactions] = useState<Record<string, boolean>>({
@@ -246,18 +248,60 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged }: Permissions
     setSelectionType('user');
     setSelectedUserId(user.id);
 
-    const userRole = user.rol || 'VENDEDOR';
-    setUserAssignedRole(userRole);
+    let roles: string[] = [];
+    if (Array.isArray(user.roles) && user.roles.length > 0) {
+      roles = user.roles;
+    } else if (typeof user.roles === 'string' && user.roles.startsWith('[')) {
+      try {
+        roles = JSON.parse(user.roles);
+      } catch {
+        roles = [user.rol || 'VENDEDOR'];
+      }
+    } else if (user.rol) {
+      roles = [user.rol];
+    } else {
+      roles = ['VENDEDOR'];
+    }
+
+    setUserAssignedRoles(roles);
+    setUserAssignedRole(roles[0] || 'VENDEDOR');
     setUserExtraPerms(Array.isArray(user.permisos_extra) ? user.permisos_extra : []);
     setUserDeniedPerms(Array.isArray(user.permisos_denegados) ? user.permisos_denegados : []);
   };
 
+  // Toggle de un rol en el multi-rol del usuario seleccionado
+  const handleToggleUserRoleInPermissions = (roleId: string) => {
+    setUserAssignedRoles(prev => {
+      const exists = prev.includes(roleId);
+      if (exists) {
+        if (prev.length === 1) {
+          toast.warning('El usuario debe conservar al menos un rol.');
+          return prev;
+        }
+        const updated = prev.filter(r => r !== roleId);
+        setUserAssignedRole(updated[0] || 'VENDEDOR');
+        return updated;
+      } else {
+        const updated = [...prev, roleId];
+        setUserAssignedRole(updated[0] || 'VENDEDOR');
+        return updated;
+      }
+    });
+  };
+
   // Sincronizar selección inicial
   useEffect(() => {
+    if (initialSelectedUserId && usersList.length > 0) {
+      const targetUser = usersList.find(u => u.id === initialSelectedUserId);
+      if (targetUser) {
+        handleSelectUser(targetUser);
+        return;
+      }
+    }
     if (rolesList.length > 0 && selectionType === 'role' && !selectedRoleId) {
       handleSelectRole(rolesList[0].id);
     }
-  }, [rolesList]);
+  }, [rolesList, usersList, initialSelectedUserId]);
 
   // Modificar asignación directa de un permiso para el ROL seleccionado
   const handleToggleRoleDirectPermission = (permId: string) => {
@@ -304,7 +348,7 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged }: Permissions
   const handleResetUserToRoleDefaults = () => {
     setUserExtraPerms([]);
     setUserDeniedPerms([]);
-    toast.info('Permisos del usuario restablecidos a los de su rol.');
+    toast.info('Permisos del usuario restablecidos a los de sus roles asignados.');
   };
 
   // Estado calculado para cada tarjeta de permiso según el sujeto seleccionado
@@ -327,9 +371,16 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged }: Permissions
       const isDenied = isPermissionIncluded(userDeniedPerms, permId);
       const isExtra = isPermissionIncluded(userExtraPerms, permId);
 
-      const roleObj = getAllRolePermissions(userAssignedRole);
-      const comesFromRole = isPermissionIncluded(roleObj.total, permId);
+      // Combinar permisos de TODOS los roles asignados al usuario
+      const combinedRolePerms: string[] = [];
+      userAssignedRoles.forEach(rId => {
+        const roleObj = getAllRolePermissions(rId);
+        roleObj.total.forEach(p => {
+          if (!combinedRolePerms.includes(p)) combinedRolePerms.push(p);
+        });
+      });
 
+      const comesFromRole = isPermissionIncluded(combinedRolePerms, permId);
       const effectiveActive = (comesFromRole || isExtra) && !isDenied;
 
       return {
@@ -338,7 +389,7 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged }: Permissions
         isInherited: comesFromRole && !isDenied && !isExtra,
         isExtra,
         isDenied,
-        sourceLabel: isDenied ? 'Bloqueado Explícitamente' : isExtra ? 'Otorgado Extra' : comesFromRole ? 'Por Rol Base' : 'Inactivo'
+        sourceLabel: isDenied ? 'Bloqueado Explícitamente' : isExtra ? 'Otorgado Extra' : comesFromRole ? 'Por Roles Asignados' : 'Inactivo'
       };
     }
   };
@@ -367,12 +418,19 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged }: Permissions
 
         toast.success(`Rol "${rolesMap.get(selectedRoleId)?.nombre || selectedRoleId}" guardado correctamente.`);
       } else if (selectionType === 'user' && selectedUserId) {
+        const primaryRole = userAssignedRoles[0] || 'VENDEDOR';
+
         const { error } = await supabase
           .from('perfiles_locales')
           .update({
-            rol: userAssignedRole,
+            rol: primaryRole,
+            roles: userAssignedRoles,
             permisos_extra: userExtraPerms,
-            permisos_denegados: userDeniedPerms
+            permisos_denegados: userDeniedPerms,
+            datos_adicionales: {
+              ...(usersList.find(u => u.id === selectedUserId)?.datos_adicionales || {}),
+              roles: userAssignedRoles
+            }
           })
           .eq('id', selectedUserId);
 
@@ -380,12 +438,13 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged }: Permissions
 
         setUsersList(prev => prev.map(u => u.id === selectedUserId ? {
           ...u,
-          rol: userAssignedRole,
+          rol: primaryRole,
+          roles: userAssignedRoles,
           permisos_extra: userExtraPerms,
           permisos_denegados: userDeniedPerms
         } : u));
 
-        toast.success('Permisos y rol del usuario guardados correctamente.');
+        toast.success('Permisos y multi-roles del usuario guardados correctamente.');
       }
 
       await onDataChanged();
@@ -1063,23 +1122,32 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged }: Permissions
                   </select>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Rol Asignado:</span>
-                  <select
-                    value={userAssignedRole}
-                    onChange={(e) => setUserAssignedRole(e.target.value)}
-                    className="px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs rounded-xl focus:outline-none focus:border-indigo-500"
-                  >
-                    {rolesList.map(r => (
-                      <option key={r.id} value={r.id}>{r.nombre}</option>
-                    ))}
-                  </select>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Roles:</span>
+                  {rolesList.map(r => {
+                    const isAssigned = userAssignedRoles.includes(r.id);
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => handleToggleUserRoleInPermissions(r.id)}
+                        className={`text-[11px] font-bold px-2 py-1 rounded-lg border transition-all cursor-pointer ${
+                          isAssigned
+                            ? 'bg-indigo-600 text-white border-indigo-500 shadow-xs'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-indigo-300'
+                        }`}
+                        title={isAssigned ? `Quitar rol ${r.nombre}` : `Asignar rol ${r.nombre}`}
+                      >
+                        {r.nombre}
+                      </button>
+                    );
+                  })}
 
                   <button
                     type="button"
                     onClick={handleResetUserToRoleDefaults}
-                    className="p-1.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl"
-                    title="Restablecer a permisos por defecto del rol"
+                    className="p-1.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl cursor-pointer"
+                    title="Restablecer a permisos por defecto de los roles asignados"
                   >
                     <RotateCcw className="w-4 h-4" />
                   </button>

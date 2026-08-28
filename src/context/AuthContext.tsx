@@ -101,9 +101,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // Obtener rol del usuario
-        const userAssignedRole = profileData?.rol || panelSession.rol || 'VENDEDOR';
-        const userRolesList = [userAssignedRole];
+        // Obtener roles del usuario (soporta multi-roles en roles o fallback a rol individual)
+        let userRolesList: string[] = [];
+        if (Array.isArray(profileData?.roles) && profileData.roles.length > 0) {
+          userRolesList = profileData.roles;
+        } else if (typeof profileData?.roles === 'string' && profileData.roles.startsWith('[')) {
+          try {
+            userRolesList = JSON.parse(profileData.roles);
+          } catch {
+            userRolesList = [profileData.rol || panelSession.rol || 'VENDEDOR'];
+          }
+        } else {
+          const userAssignedRole = profileData?.rol || panelSession.rol || 'VENDEDOR';
+          userRolesList = [userAssignedRole];
+        }
 
         // Obtener roles y su herencia desde seguridad_roles
         const { data: dbRolesData } = await supabase
@@ -144,8 +155,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return currentPerms;
         };
 
-        // Permisos base obtenidos del rol y su jerarquía
-        const baseRolePerms = getInheritedRolePermissions(userAssignedRole);
+        // Permisos base obtenidos de la suma de TODOS los roles asignados y su jerarquía
+        const baseRolePermsSet = new Set<string>();
+        userRolesList.forEach(rId => {
+          const rolePerms = getInheritedRolePermissions(rId);
+          rolePerms.forEach(p => baseRolePermsSet.add(p));
+        });
+        const baseRolePerms = Array.from(baseRolePermsSet);
 
         // Permisos extra y permisos denegados del usuario
         const userExtra = Array.isArray(profileData?.permisos_extra) 

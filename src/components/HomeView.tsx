@@ -1441,6 +1441,26 @@ export function HomeView() {
       badge: 'Cuenta'
     },
     {
+      id: 'cfg_users',
+      title: 'Gestión de Usuarios & Perfiles',
+      shortTitle: 'Usuarios',
+      description: 'Administración de operadores, datos personales, perfiles XTV y G3D con multi-roles.',
+      icon: ICON_MAP['Users'] || Users,
+      defaultIconName: 'Users',
+      color1: '#6366f1',
+      color2: '#4338ca',
+      innerBg: 'from-indigo-400 to-indigo-700',
+      shadowColor: 'rgba(99, 102, 241, 0.45)',
+      action: () => {
+        if (!hasPermission('Admin.VistaGeneral.Ver')) {
+          toast.warning("Se requiere nivel de Administrador para gestionar usuarios");
+          return;
+        }
+        navigate('/configuracion?tab=users');
+      },
+      badge: 'Operadores'
+    },
+    {
       id: 'cfg_business',
       title: 'Negocio & Marca',
       shortTitle: 'Negocio',
@@ -1532,7 +1552,7 @@ export function HomeView() {
       badge: 'Menú'
     }
   ].filter(item => {
-    if (item.id === 'cfg_permissions' || item.id === 'cfg_apis' || item.id === 'cfg_security') {
+    if (item.id === 'cfg_users' || item.id === 'cfg_permissions' || item.id === 'cfg_apis' || item.id === 'cfg_security') {
       return hasPermission('Admin.VistaGeneral.Ver') || userRole === 'Administrador' || userRole === 'Admin';
     }
     return true;

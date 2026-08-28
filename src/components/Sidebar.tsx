@@ -20,6 +20,8 @@ import {
   History,
   Settings,
   User,
+  Users,
+  ShieldCheck,
   Bug,
   Sparkles,
   Tv
@@ -104,6 +106,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   // Módulo Sistema & Auditoría
   const systemItems = [
+    { to: "/configuracion?tab=users", label: "Usuarios & Perfiles", icon: Users, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
+    { to: "/configuracion?tab=permissions", label: "Permisos RBAC", icon: ShieldCheck, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
     { to: "/reportes", label: "Centro de Reportes", icon: Bug, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id, badge: true },
     { to: "/historial", label: "Historial de Auditoría", icon: History, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
     { to: "/configuracion", label: "Ajustes del Sistema", icon: Settings, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
@@ -539,7 +543,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <div className="relative pl-7 pr-1 py-1 flex flex-col gap-1">
                   <div className="absolute left-[18px] top-0 bottom-4 w-px bg-slate-200 dark:bg-slate-800/80 pointer-events-none" />
                   {systemItems.map((item) => {
-                    const isActive = location.pathname === item.to;
+                    const currentFullPath = location.pathname + (location.search || '');
+                    const isActive = item.to.includes('?') 
+                      ? currentFullPath === item.to 
+                      : (location.pathname === item.to && (!location.search || location.search === ''));
                     return (
                       <NavLink
                         key={item.to}
