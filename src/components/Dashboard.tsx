@@ -1520,18 +1520,6 @@ export function Dashboard() {
       showCondition: hasPermission("Iptv.Tutoriales.Ver") || hasPermission("Iptv.*") || hasPermission("Admin.*"),
     },
     {
-      id: "invitacion",
-      title: "Invitaci√≥n",
-      badge: "üì© Sumar Socios",
-      iconName: "UserCheck",
-      color1: "#6366f1",
-      color2: "#4f46e5",
-      action: () => {
-        selectMenuWithScroll("invitacion");
-      },
-      showCondition: true,
-    },
-    {
       id: "ajustes_configuracion",
       title: "Ajustes XTV",
       badge: "‚öôÔ∏è Gesti√≥n Central",
@@ -7156,13 +7144,38 @@ export function Dashboard() {
                   const recruiter = recruiterMap.get(seller) || "";
                   
                   const plan = salePlans.find((p: any) => String(p.id) === String(acc.id_plan_venta));
-                  const planComm = plan && Number(plan.comision) > 0 ? Number(plan.comision) : 5000;
-                  
                   const planNombre = plan?.name || acc.plan_nombre || "Plan IPTV";
-                  const totalComm = planComm;
+
+                  // Determinaci√≥n de comisiones seg√∫n plan (Multinivel)
+                  const rawSellerComm = plan?.comision_vendedor != null 
+                    ? Number(plan.comision_vendedor) 
+                    : (plan && Number(plan.comision) > 0 ? Math.round(Number(plan.comision) * 0.8) : 4000);
+
+                  const rawRecruiterComm = plan?.comision_padre != null 
+                    ? Number(plan.comision_padre) 
+                    : (plan && Number(plan.comision) > 0 ? Math.round(Number(plan.comision) * 0.2) : 1000);
+
+                  const totalComm = rawSellerComm + rawRecruiterComm;
+
+                  // Verificaci√≥n de Actividad del Vendedor en los √∫ltimos 30 d√≠as respecto a la fecha de la venta
+                  const saleDate = new Date(acc.creado_al || acc.fecha_creacion || Date.now());
+                  const thirtyDaysBefore = new Date(saleDate.getTime() - (30 * 24 * 60 * 60 * 1000));
                   
-                  const defaultSellerComm = Math.round(planComm * 0.8);
-                  const defaultRecruiterComm = Math.round(planComm * 0.2);
+                  // Contar ventas del vendedor en esa ventana previa de 30 d√≠as
+                  const salesInPeriod = accounts.filter((otherAcc: any) => {
+                    const otherSeller = (otherAcc.creado_por || "").toLowerCase().trim();
+                    if (otherSeller !== seller) return false;
+                    const otherUserLower = (otherAcc.username || "").toLowerCase().trim();
+                    const otherPlanLower = (otherAcc.plan_nombre || "").toLowerCase().trim();
+                    if (otherUserLower.startsWith("demo") || otherPlanLower.includes("demo")) return false;
+                    const otherDate = new Date(otherAcc.creado_al || otherAcc.fecha_creacion || 0);
+                    return otherDate >= thirtyDaysBefore && otherDate <= saleDate;
+                  }).length;
+
+                  // Si tiene al menos 1 venta (incluyendo la actual), est√° activo (100%), de lo contrario pasivo (50%)
+                  const isSellerActive = salesInPeriod >= 1;
+                  const defaultSellerComm = isSellerActive ? rawSellerComm : Math.round(rawSellerComm * 0.5);
+                  const defaultRecruiterComm = rawRecruiterComm;
 
                   const sellerProfile = panelUsers.find(u => u.usuario.trim().toLowerCase() === seller);
                   const sellerName = sellerProfile ? sellerProfile.nombre : capitalizeName(seller);
@@ -7231,6 +7244,8 @@ export function Dashboard() {
                     comprobanteImg,
                     notes,
                     creado_al: acc.creado_al || acc.fecha_creacion || new Date().toISOString(),
+                    isSellerActive,
+                    rawSellerComm,
                     paymentRecord: payment
                   };
                 });
@@ -9860,4307 +9875,131 @@ export function Dashboard() {
                                           ...visibleUsernames,
                                         ]);
                                         return Array.from(union);
-                                      });
-                                    } else {
-                                      // Quitar los visibles
-                                      const visibleUsernames =
-                                        filteredClients.map(
-                                          (acc: any) => acc.username,
-                                        );
-                                      setSelectedClients((prev) =>
-                                        prev.filter(
-                                          (u) => !visibleUsernames.includes(u),
-                                        ),
-                                      );
-                                    }
-                                  }}
-                                  className="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-cyan-600 focus:ring-cyan-500 h-3.5 w-3.5 cursor-pointer"
-                                />
-                              </th>
-                              <th className="p-3">Cliente / Celular</th>
-                              <th className="p-3">Usuario / Contrase√±a</th>
-                              <th className="p-3">Plan Contratado</th>
-                              <th className="p-3">Vencimiento</th>
-                              <th className="p-3">
-                                <div className="flex items-center gap-1">
-                                  <span>Comisi√≥n</span>
-                                  <button
-                                    onClick={() =>
-                                      setShowCommissions(!showCommissions)
-                                    }
-                                    className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors text-slate-500"
-                                    title={
-                                      showCommissions
-                                        ? "Ocultar Comisi√≥n"
-                                        : "Ver Comisi√≥n"
-                                    }
-                                  >
-                                    {showCommissions ? (
-                                      <EyeOff size={12} />
-                                    ) : (
-                                      <Eye size={12} />
-                                    )}
-                                  </button>
-                                </div>
-                              </th>
-                              <th className="p-3">Precio Plan</th>
-                              <th className="p-3">Estado</th>
-                              <th className="p-3 text-right">Acci√≥n</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {filteredClients.map((acc: any) => {
-                              const isExpired =
-                                acc.fecha_vencimiento &&
-                                new Date(acc.fecha_vencimiento).getTime() <
-                                  Date.now();
-                              const isDemo = !acc.id_plan_venta;
-                              const isSelected = selectedClients.includes(
-                                acc.username,
-                              );
-
-                              // Obtener datos del plan de venta asignado
-                              const assignedPlan = salePlans.find(
-                                (p: any) => p.id === acc.id_plan_venta,
-                              );
-                              const planName = assignedPlan
-                                ? assignedPlan.name
-                                : acc.id_plan_venta
-                                  ? `Plan ${acc.id_plan_venta}`
-                                  : "Demo gratis";
-                              const planPrice = assignedPlan
-                                ? assignedPlan.price || 0
-                                : 0;
-                              const planCommission = assignedPlan
-                                ? assignedPlan.comision || 0
-                                : 0;
-
-                              // Formatear fecha
-                              let expiryLabel = "Sin L√≠mite";
-                              if (acc.fecha_vencimiento) {
-                                const d = new Date(acc.fecha_vencimiento);
-                                expiryLabel =
-                                  d.toLocaleDateString() +
-                                  " " +
-                                  d.toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  });
-                              }
-
-                              return (
-                                <tr
-                                  key={acc.username}
-                                  className={`transition-colors ${
-                                    isSelected
-                                      ? "bg-rose-50/40 dark:bg-rose-950/5"
-                                      : "hover:bg-slate-50/50 dark:hover:bg-slate-850/20"
-                                  }`}
-                                >
-                                  <td className="p-3 text-center">
-                                    <input
-                                      type="checkbox"
-                                      checked={isSelected}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setSelectedClients((prev) => [
-                                            ...prev,
-                                            acc.username,
-                                          ]);
-                                        } else {
-                                          setSelectedClients((prev) =>
-                                            prev.filter(
-                                              (u) => u !== acc.username,
-                                            ),
-                                          );
-                                        }
-                                      }}
-                                      className="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-cyan-600 focus:ring-cyan-500 h-3.5 w-3.5 cursor-pointer"
-                                    />
-                                  </td>
-                                  <td className="p-3 text-left">
-                                    <div className="space-y-0.5">
-                                      <p className="font-extrabold text-slate-800 dark:text-slate-100">
-                                        {acc.nombre_completo || "Cliente"}
-                                      </p>
-                                      <div className="flex items-center gap-1.5">
-                                        <p className="text-[10px] text-slate-450 font-bold">
-                                          {acc.celular || "Sin tel√©fono"}
-                                        </p>
-                                        {acc.celular && (
-                                          <a
-                                            href={`https://wa.me/${acc.celular.replace(/[^0-9]/g, "")}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="p-1 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 rounded-md hover:scale-105 transition-transform"
-                                            title="Contactar por WhatsApp"
-                                          >
-                                            <Send size={10} />
-                                          </a>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="p-3">
-                                    <div className="space-y-1">
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] font-bold text-slate-400">
-                                          U:
-                                        </span>
-                                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200 select-all">
-                                          {acc.username}
-                                        </span>
-                                        <button
-                                          onClick={() => {
-                                            navigator.clipboard.writeText(
-                                              acc.username,
-                                            );
-                                            toast.success("Usuario copiado");
-                                          }}
-                                          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-slate-600"
-                                        >
-                                          <Copy size={11} />
-                                        </button>
-                                      </div>
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] font-bold text-slate-400">
-                                          P:
-                                        </span>
-                                        <PasswordCell
-                                          value={acc.password}
-                                          onCopy={(t, msg) => {
-                                            navigator.clipboard.writeText(t);
-                                            toast.success(
-                                              msg || "Contrase√±a copiada",
-                                            );
-                                          }}
-                                        />
-                                        <button
-                                          onClick={() => {
-                                            navigator.clipboard.writeText(
-                                              acc.password,
-                                            );
-                                            toast.success("Contrase√±a copiada");
-                                          }}
-                                          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-slate-600"
-                                        >
-                                          <Copy size={11} />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="p-3">
-                                    <div className="space-y-0.5 text-left">
-                                      <span
-                                        className={`px-2 py-0.5 rounded text-[9px] font-black uppercase inline-block ${
-                                          isDemo
-                                            ? "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                                            : "bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300"
-                                        }`}
-                                      >
-                                        {planName}
-                                      </span>
-                                      <p className="text-[10px] text-slate-450 font-bold">
-                                        {acc.limite_pantallas || 2} Pantallas
-                                      </p>
-                                    </div>
-                                  </td>
-                                  <td className="p-3 font-bold text-slate-700 dark:text-slate-300">
-                                    <div className="flex items-center gap-1.5">
-                                      <Clock
-                                        size={11}
-                                        className="text-slate-400"
-                                      />
-                                      <span>{expiryLabel}</span>
-                                    </div>
-                                  </td>
-                                  <td className="p-3 font-semibold text-slate-800 dark:text-slate-250">
-                                    {showCommissions ? (
-                                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
-                                        ${planCommission.toLocaleString()}
-                                      </span>
-                                    ) : (
-                                      <span className="text-slate-400 select-none">
-                                        ‚Ä¢‚Ä¢‚Ä¢‚Ä¢
-                                      </span>
-                                    )}
-                                  </td>
-                                  <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">
-                                    ${planPrice.toLocaleString()}
-                                  </td>
-                                  <td className="p-3">
-                                    <span
-                                      className={`px-2 py-1 rounded-full text-[9px] font-black uppercase ${
-                                        isExpired
-                                          ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300"
-                                          : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                      }`}
-                                    >
-                                      {isExpired ? "Expirado" : "Activo"}
-                                    </span>
-                                  </td>
-                                  <td className="p-3 text-right">
-                                    <div
-                                      className="flex items-center justify-end gap-1.5"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {/* Bot√≥n Editar - Solo visible para Administradores */}
-                                      {isAdmin && (
-                                        <button
-                                          onClick={() =>
-                                            startEditingClient(acc)
-                                          }
-                                          className="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg transition-colors border border-slate-200 dark:border-slate-700/60"
-                                          title="Editar Cliente"
-                                        >
-                                          <Pencil size={11} />
-                                        </button>
-                                      )}
-
-                                      {/* Bot√≥n Renovar - Disponible para todos */}
-                                      <button
-                                        onClick={() => {
-                                          setSelectedClientForDetails(acc);
-                                          setRequestRenewClient(acc);
-                                          setRenewStep("details");
-                                          setSelectedPlanForRenew(null);
-                                          setRequestRenewComprobante(null);
-                                          setRequestRenewComments("");
-                                          setRequestRenewPlanId(
-                                            acc.id_plan_venta || "",
-                                          );
-                                          setCurrentMenu("renovaciones");
-                                        }}
-                                        className="p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-sm"
-                                        title="Renovar Cliente"
-                                      >
-                                        <RefreshCw size={11} />
-                                      </button>
-
-                                      {/* Bot√≥n Eliminar - Solo visible para Administradores */}
-                                      {isAdmin && (
-                                        <button
-                                          onClick={() => handleDeleteClients([acc.username])}
-                                          className="p-1.5 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-600 hover:text-rose-700 rounded-lg transition-colors border border-rose-200/50 dark:border-rose-900/30"
-                                          title="Eliminar Cliente"
-                                        >
-                                          <Trash2 size={11} />
-                                        </button>
-                                      )}
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      ) : (
-                        <div className="py-12 text-center text-slate-400 space-y-2">
-                          <Users
-                            size={32}
-                            className="mx-auto text-slate-300 dark:text-slate-700"
-                          />
-                          <p className="text-xs font-bold uppercase tracking-wider">
-                            No se encontraron clientes
-                          </p>
-                          <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
-                            Prueba cambiando el filtro o realizando una b√∫squeda
-                            diferente.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-          {/* F. SECCI√ìN DE FINANZAS Y RED DE RECLUTAMIENTO DE REVENDEDORES (XTV) */}
-          {currentMenu === "finanzas_vendedores" &&
-            (() => {
-              const sellerEmailLower = (user?.email || "").toLowerCase().trim();
-              const isUserAdmin = isAdmin;
-              const activeUserName = panelUsers.find(u => u.usuario.trim().toLowerCase() === sellerEmailLower)?.nombre || capitalizeName(sellerEmailLower);
-
-              // Construir mapa de reclutadores
-              const recruiterMap = new Map<string, string>();
-              vendedoresRelaciones.forEach(r => {
-                if (r.invited_email && r.inviter_email) {
-                  recruiterMap.set(r.invited_email.toLowerCase().trim(), r.inviter_email.toLowerCase().trim());
-                }
-              });
-
-              // Mapeo completo de comisiones por cliente (excluyendo demos)
-              const allCommissionRows = accounts
-                .filter((acc: any) => {
-                  const plan = salePlans.find((p: any) => String(p.id) === String(acc.id_plan_venta));
-                  const planNombre = plan?.name || acc.plan_nombre || "Plan IPTV";
-                  const usernameLower = (acc.username || "").toLowerCase().trim();
-                  const planNameLower = (planNombre || "").toLowerCase().trim();
-                  const isDemo = usernameLower.startsWith("demo") || planNameLower.includes("demo");
-                  return !isDemo;
-                })
-                .map((acc: any) => {
-                  const seller = (acc.creado_por || "").toLowerCase().trim();
-                  const recruiter = recruiterMap.get(seller) || "";
-                  
-                  const plan = salePlans.find((p: any) => String(p.id) === String(acc.id_plan_venta));
-                  const planComm = plan && Number(plan.comision) > 0 ? Number(plan.comision) : 5000;
-                  
-                  const planNombre = plan?.name || acc.plan_nombre || "Plan IPTV";
-                  const totalComm = planComm;
-                  
-                  const defaultSellerComm = Math.round(planComm * 0.8);
-                  const defaultRecruiterComm = Math.round(planComm * 0.2);
-
-                  const sellerProfile = panelUsers.find(u => u.usuario.trim().toLowerCase() === seller);
-                  const sellerName = sellerProfile ? sellerProfile.nombre : capitalizeName(seller);
-
-                  const recruiterProfile = recruiter ? panelUsers.find(u => u.usuario.trim().toLowerCase() === recruiter) : null;
-                  const recruiterName = recruiterProfile ? recruiterProfile.nombre : (recruiter ? capitalizeName(recruiter) : "Directo (Sin Red)");
-
-                  const payment = finanzasComisionesPagos.find((p: any) => p.cliente_id === acc.username);
-                  
-                  const isSellerPaid = payment ? (payment.estado_pago === 'vendedor_pagado' || payment.estado_pago === 'completo') : false;
-                  const isRecruiterPaid = payment ? (payment.estado_pago === 'reclutador_pagado' || payment.estado_pago === 'completo') : false;
-                  const isFullyPaid = payment ? (payment.estado_pago === 'completo') : false;
-
-                  const vComm = payment ? Number(payment.comision_vendedor) : defaultSellerComm;
-                  const rComm = payment ? Number(payment.comision_reclutador) : defaultRecruiterComm;
-
-                  const vAbonado = payment
-                    ? (payment.vendedor_abonado !== undefined && payment.vendedor_abonado !== null
-                        ? Number(payment.vendedor_abonado)
-                        : (isSellerPaid ? vComm : 0))
-                    : 0;
-
-                  const rAbonado = payment
-                    ? (payment.reclutador_abonado !== undefined && payment.reclutador_abonado !== null
-                        ? Number(payment.reclutador_abonado)
-                        : (isRecruiterPaid ? rComm : 0))
-                    : 0;
-
-                  const vSaldo = Math.max(0, vComm - vAbonado);
-                  const rSaldo = Math.max(0, rComm - rAbonado);
-
-                  const isSellerParcial = vAbonado > 0 && vAbonado < vComm;
-                  const isRecruiterParcial = rAbonado > 0 && rAbonado < rComm;
-
-                  const isSellerRequested = payment ? !!payment.solicitado_vendedor : false;
-                  const isRecruiterRequested = payment ? !!payment.solicitado_reclutador : false;
-                  const requestedSellerAt = payment ? payment.solicitado_vendedor_al : null;
-                  const requestedRecruiterAt = payment ? payment.solicitado_reclutador_al : null;
-                  const comprobanteImg = payment ? payment.comprobante_img || "" : "";
-                  const notes = payment ? payment.notes || "" : "";
-
-                  return {
-                    cliente_id: acc.username,
-                    cliente_nombre: acc.nombre_completo || acc.username,
-                    plan_nombre: planNombre,
-                    seller,
-                    sellerName,
-                    recruiter,
-                    recruiterName,
-                    totalComm,
-                    vComm,
-                    rComm,
-                    vAbonado,
-                    rAbonado,
-                    vSaldo,
-                    rSaldo,
-                    isSellerPaid,
-                    isRecruiterPaid,
-                    isFullyPaid,
-                    isSellerParcial,
-                    isRecruiterParcial,
-                    isSellerRequested,
-                    isRecruiterRequested,
-                    requestedSellerAt,
-                    requestedRecruiterAt,
-                    comprobanteImg,
-                    notes,
-                    creado_al: acc.creado_al || acc.fecha_creacion || new Date().toISOString(),
-                    paymentRecord: payment
-                  };
-                });
-
-              // Filtrar seg√∫n el rol (Para el listado de Mis Comisiones, mostramos solo las propias y las de su red de reclutamiento)
-              const visibleCommissions = allCommissionRows.filter(row => {
-                return row.seller === sellerEmailLower || row.recruiter === sellerEmailLower;
-              });
-
-              // B√∫squeda textual
-              const searchedCommissions = visibleCommissions.filter(row => {
-                if (!commissionSearch.trim()) return true;
-                const term = commissionSearch.toLowerCase();
-                return (
-                  row.cliente_id.toLowerCase().includes(term) ||
-                  row.cliente_nombre.toLowerCase().includes(term) ||
-                  row.plan_nombre.toLowerCase().includes(term) ||
-                  row.seller.toLowerCase().includes(term) ||
-                  row.recruiter.toLowerCase().includes(term) ||
-                  row.sellerName.toLowerCase().includes(term) ||
-                  row.recruiterName.toLowerCase().includes(term)
-                );
-              });
-
-              // C√°lculos de m√©tricas
-              const mySellerPending = allCommissionRows
-                .filter(r => r.seller === sellerEmailLower && !r.isSellerPaid)
-                .reduce((acc, curr) => acc + curr.vComm, 0);
-
-              const mySellerPaid = allCommissionRows
-                .filter(r => r.seller === sellerEmailLower && r.isSellerPaid)
-                .reduce((acc, curr) => acc + curr.vComm, 0);
-
-              const myRecruiterPending = allCommissionRows
-                .filter(r => r.recruiter === sellerEmailLower && !r.isRecruiterPaid)
-                .reduce((acc, curr) => acc + curr.rComm, 0);
-
-              const myRecruiterPaid = allCommissionRows
-                .filter(r => r.recruiter === sellerEmailLower && r.isRecruiterPaid)
-                .reduce((acc, curr) => acc + curr.rComm, 0);
-
-              const globalTotalPending = allCommissionRows
-                .reduce((acc, curr) => {
-                  let pending = 0;
-                  if (!curr.isSellerPaid) pending += curr.vComm;
-                  if (curr.recruiter && !curr.isRecruiterPaid) pending += curr.rComm;
-                  return acc + pending;
-                }, 0);
-
-              const globalTotalPaid = allCommissionRows
-                .reduce((acc, curr) => {
-                  let paid = 0;
-                  if (curr.isSellerPaid) paid += curr.vComm;
-                  if (curr.recruiter && curr.isRecruiterPaid) paid += curr.rComm;
-                  return acc + paid;
-                }, 0);
-
-              const myDirectRecruits = vendedoresRelaciones.filter(r => r.inviter_email.toLowerCase().trim() === sellerEmailLower);
-
-              return (
-                <div id="active-widget-container" className="space-y-6">
-                  {/* Cabecera / Banner Airbnb Style */}
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-1 bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1">
-                          üíµ M√≥dulo Activo
-                        </span>
-                        <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                          Finanzas y Red de Vendedores
-                        </h2>
-                      </div>
-                      <p className="text-xs text-slate-500 max-w-xl">
-                        Administra el pago de comisiones, visualiza liquidaciones del panel de revendedores, y gestiona tu red de vendedores referidos con herencia pasiva.
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => selectMenuWithScroll("inicio")}
-                      className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 transition-all font-bold text-xs flex items-center gap-2 shadow-sm self-stretch md:self-auto"
-                    >
-                      ‚Üê Volver al Launchpad
-                    </button>
-                  </div>
-
-                  {/* Bento Grid de M√©tricas Financieras */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Caja 1: Mis Ventas Directas */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Mis Ventas Directas</span>
-                        <span className="p-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-500 rounded-xl">
-                          <DollarSign size={18} />
-                        </span>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                          ${(mySellerPending + mySellerPaid).toLocaleString()} ARS
-                        </p>
-                        <div className="flex items-center gap-3 text-xs">
-                          <span className="text-amber-500 font-bold flex items-center gap-0.5">
-                            ‚óè Pendiente: ${mySellerPending.toLocaleString()}
-                          </span>
-                          <span className="text-emerald-500 font-bold flex items-center gap-0.5">
-                            ‚úì Cobrado: ${mySellerPaid.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Caja 2: Ingresos de Red (Reclutador) */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Red Pasiva Reclutados</span>
-                        <span className="p-2 bg-blue-50 dark:bg-blue-950/20 text-blue-500 rounded-xl">
-                          <Share2 size={18} />
-                        </span>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                          ${(myRecruiterPending + myRecruiterPaid).toLocaleString()} ARS
-                        </p>
-                        <div className="flex items-center gap-3 text-xs">
-                          <span className="text-amber-500 font-bold flex items-center gap-0.5">
-                            ‚óè Pendiente: ${myRecruiterPending.toLocaleString()}
-                          </span>
-                          <span className="text-emerald-500 font-bold flex items-center gap-0.5">
-                            ‚úì Cobrado: ${myRecruiterPaid.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Caja 3: Estado de Red o M√©tricas Globales */}
-                    {isUserAdmin ? (
-                      <div className="bg-slate-900 text-white border border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Caja Global Liquidaciones (Admin)</span>
-                          <span className="p-2 bg-amber-500/20 text-amber-400 rounded-xl">
-                            <TrendingUp size={18} />
-                          </span>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-2xl font-black tracking-tight">
-                            ${(globalTotalPending + globalTotalPaid).toLocaleString()} ARS
-                          </p>
-                          <div className="flex items-center gap-3 text-xs">
-                            <span className="text-amber-400 font-bold">
-                              ‚óè Por Pagar: ${globalTotalPending.toLocaleString()}
-                            </span>
-                            <span className="text-emerald-400 font-bold">
-                              ‚úì Liquidado: ${globalTotalPaid.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Mi Red</span>
-                          <span className="p-2 bg-purple-50 dark:bg-purple-950/20 text-purple-500 rounded-xl">
-                            <Users size={18} />
-                          </span>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                            {myDirectRecruits.length} {myDirectRecruits.length === 1 ? 'Vendedor' : 'Vendedores'}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            Recluta nuevos vendedores para comisionar un porcentaje de sus ventas.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Solapas de Navegaci√≥n del Panel de Finanzas */}
-                  <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1 overflow-x-auto pb-px">
-                    <button
-                      onClick={() => setFinanzasTab("mis_comisiones")}
-                      className={`px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-all ${
-                        finanzasTab === "mis_comisiones"
-                          ? "border-slate-900 dark:border-white text-slate-950 dark:text-white font-black"
-                          : "border-transparent text-slate-500 hover:text-slate-900"
-                      }`}
-                    >
-                      üßæ Mis Comisiones y Ventas
-                    </button>
-                    
-                    <button
-                      onClick={() => setFinanzasTab("red")}
-                      className={`px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-all ${
-                        finanzasTab === "red"
-                          ? "border-slate-900 dark:border-white text-slate-950 dark:text-white font-black"
-                          : "border-transparent text-slate-500 hover:text-slate-900"
-                      }`}
-                    >
-                      üë• Mi Red y Reclutamiento
-                    </button>
-
-                    {isUserAdmin && (
-                      <button
-                        onClick={() => setFinanzasTab("liquidaciones")}
-                        className={`px-4 py-3 text-xs font-bold border-b-2 whitespace-nowrap transition-all ${
-                          finanzasTab === "liquidaciones"
-                            ? "border-slate-900 dark:border-white text-slate-950 dark:text-white font-black"
-                            : "border-transparent text-slate-500 hover:text-slate-900"
-                        }`}
-                      >
-                        ‚öñÔ∏è Liquidar Comisiones (Admin)
-                      </button>
-                    )}
-                  </div>
-
-                  {/* TAB 1: MIS COMISIONES Y VENTAS */}
-                  {finanzasTab === "mis_comisiones" && (
-                    <div className="space-y-4">
-                      {/* Cabecera de Acciones para Cobros del Vendedor */}
-                      <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-4">
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                            <div className="space-y-1">
-                              <h4 className="text-xs font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5">
-                                üí∞ Gesti√≥n de Retiros y Comisiones
-                              </h4>
-                              <p className="text-[11px] text-slate-500">
-                                Administra tus ingresos y solicita la liquidaci√≥n de tus comisiones pendientes de pago.
-                              </p>
-                            </div>
-                            
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newMode = !showSelectionCheckboxes;
-                                setShowSelectionCheckboxes(newMode);
-                                if (!newMode) {
-                                  setSelectedCommissionsToRequestPayout([]);
-                                }
-                              }}
-                              className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm ${
-                                showSelectionCheckboxes
-                                  ? "bg-amber-500 hover:bg-amber-600 text-white"
-                                  : "bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-850 dark:hover:bg-slate-100"
-                              }`}
-                            >
-                              {showSelectionCheckboxes ? "‚ùå Cancelar Selecci√≥n" : "üíµ Solicitar pago de comisiones"}
-                            </button>
-                          </div>
-
-                          {showSelectionCheckboxes && (
-                            <div className="pt-3 border-t border-slate-200/60 dark:border-slate-800/60 space-y-3">
-                              <p className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">
-                                Acciones de Selecci√≥n R√°pida
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const eligibleSellers = searchedCommissions.filter(row => {
-                                      const isCurrentSeller = row.seller === sellerEmailLower;
-                                      const isPaid = isCurrentSeller ? row.isSellerPaid : false;
-                                      const isRequested = isCurrentSeller ? row.isSellerRequested : false;
-                                      return isCurrentSeller && !isPaid && !isRequested;
-                                    }).map(row => row.cliente_id);
-                                    setSelectedCommissionsToRequestPayout(eligibleSellers);
-                                    toast.success(`Se seleccionaron ${eligibleSellers.length} comisiones de venta propia.`);
-                                  }}
-                                  className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-750 dark:text-slate-200 rounded-lg font-bold text-[11px] transition-all"
-                                >
-                                  üéØ Seleccionar mis comisiones de venta
-                                </button>
-                                
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const eligibleRecruiters = searchedCommissions.filter(row => {
-                                      const isCurrentRecruiter = row.recruiter === sellerEmailLower;
-                                      const isPaid = isCurrentRecruiter ? row.isRecruiterPaid : false;
-                                      const isRequested = isCurrentRecruiter ? row.isRecruiterRequested : false;
-                                      return isCurrentRecruiter && !isPaid && !isRequested;
-                                    }).map(row => row.cliente_id);
-                                    setSelectedCommissionsToRequestPayout(eligibleRecruiters);
-                                    toast.success(`Se seleccionaron ${eligibleRecruiters.length} comisiones de revendedores.`);
-                                  }}
-                                  className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-750 dark:text-slate-200 rounded-lg font-bold text-[11px] transition-all"
-                                >
-                                  üë• Seleccionar comisiones de mis revendedores
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const allEligible = searchedCommissions.filter(row => {
-                                      const isCurrentSeller = row.seller === sellerEmailLower;
-                                      const isCurrentRecruiter = row.recruiter === sellerEmailLower;
-                                      const isPaid = isCurrentSeller ? row.isSellerPaid : (isCurrentRecruiter ? row.isRecruiterPaid : false);
-                                      const isRequested = isCurrentSeller ? row.isSellerRequested : (isCurrentRecruiter ? row.isRecruiterRequested : false);
-                                      return !isPaid && !isRequested;
-                                    }).map(row => row.cliente_id);
-                                    setSelectedCommissionsToRequestPayout(allEligible);
-                                    toast.success(`Se seleccionaron ${allEligible.length} comisiones en total.`);
-                                  }}
-                                  className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-750 dark:text-slate-200 rounded-lg font-bold text-[11px] transition-all"
-                                >
-                                  ‚ú® Seleccionar todo
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedCommissionsToRequestPayout([]);
-                                    toast.info("Selecci√≥n limpiada.");
-                                  }}
-                                  className="px-3 py-1.5 border border-slate-200 dark:border-slate-750 hover:bg-slate-100 dark:hover:bg-slate-850 text-slate-500 rounded-lg font-bold text-[11px] transition-all"
-                                >
-                                  Borrar Selecci√≥n
-                                </button>
-                              </div>
-
-                              <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                <span className="text-[11px] text-slate-500 font-medium">
-                                  Filas seleccionadas: <strong className="text-slate-800 dark:text-white font-extrabold">{selectedCommissionsToRequestPayout.length}</strong>
-                                </span>
-                                <div className="flex gap-2 w-full sm:w-auto">
-                                  <button
-                                    type="button"
-                                    disabled={selectedCommissionsToRequestPayout.length === 0}
-                                    onClick={async () => {
-                                      await handleRequestCommissionPayout(selectedCommissionsToRequestPayout);
-                                      setSelectedCommissionsToRequestPayout([]);
-                                      setShowSelectionCheckboxes(false);
-                                    }}
-                                    className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-extrabold text-xs transition-all shadow-sm flex items-center justify-center gap-1.5"
-                                  >
-                                    ‚úì Solicitar Seleccionadas ({selectedCommissionsToRequestPayout.length})
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                      {/* Buscador de Comisiones */}
-                      <div className="relative">
-                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                          <Search size={16} />
-                        </span>
-                        <input
-                          type="text"
-                          value={commissionSearch}
-                          onChange={(e) => setCommissionSearch(e.target.value)}
-                          placeholder="Buscar por cliente, plan, vendedor..."
-                          className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-slate-500 dark:text-white"
-                        />
-                      </div>
-
-                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left border-collapse">
-                            <thead>
-                              <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
-                                {showSelectionCheckboxes && (
-                                  <th className="p-4 w-10 text-center">
-                                    <input
-                                      type="checkbox"
-                                      checked={
-                                        searchedCommissions.length > 0 &&
-                                        searchedCommissions.filter(row => {
-                                          const isCurrentSeller = row.seller === sellerEmailLower;
-                                          const isCurrentRecruiter = row.recruiter === sellerEmailLower;
-                                          const isPaid = isCurrentSeller ? row.isSellerPaid : (isCurrentRecruiter ? row.isRecruiterPaid : false);
-                                          const isRequested = isCurrentSeller ? row.isSellerRequested : (isCurrentRecruiter ? row.isRecruiterRequested : false);
-                                          return !isPaid && !isRequested;
-                                        }).every(row => selectedCommissionsToRequestPayout.includes(row.cliente_id))
-                                      }
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          const eligible = searchedCommissions
-                                            .filter(row => {
-                                              const isCurrentSeller = row.seller === sellerEmailLower;
-                                              const isCurrentRecruiter = row.recruiter === sellerEmailLower;
-                                              const isPaid = isCurrentSeller ? row.isSellerPaid : (isCurrentRecruiter ? row.isRecruiterPaid : false);
-                                              const isRequested = isCurrentSeller ? row.isSellerRequested : (isCurrentRecruiter ? row.isRecruiterRequested : false);
-                                              return !isPaid && !isRequested;
-                                            })
-                                            .map(row => row.cliente_id);
-                                          setSelectedCommissionsToRequestPayout(eligible);
-                                        } else {
-                                          setSelectedCommissionsToRequestPayout([]);
-                                        }
-                                      }}
-                                      className="rounded border-slate-300"
-                                    />
-                                  </th>
-                                )}
-                                <th className="p-4 text-[10px] uppercase font-bold text-slate-400">Cliente/Plan</th>
-                                <th className="p-4 text-[10px] uppercase font-bold text-slate-400">Vendedor</th>
-                                <th className="p-4 text-[10px] uppercase font-bold text-slate-400">Revendedor</th>
-                                <th className="p-4 text-[10px] uppercase font-bold text-slate-400">Mi Comisi√≥n</th>
-                                <th className="p-4 text-[10px] uppercase font-bold text-slate-400 text-right">Estado Liquidaci√≥n</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
-                              {searchedCommissions.length > 0 ? (
-                                searchedCommissions.map((row: any, idx: number) => {
-                                  const isCurrentSeller = row.seller === sellerEmailLower;
-                                  const isCurrentRecruiter = row.recruiter === sellerEmailLower;
-                                  
-                                  let miPorcion = 0;
-                                  let miEstado = false;
-                                  let miSolicitado = false;
-                                  if (isCurrentSeller) {
-                                    miPorcion = row.vComm;
-                                    miEstado = row.isSellerPaid;
-                                    miSolicitado = row.isSellerRequested;
-                                  } else if (isCurrentRecruiter) {
-                                    miPorcion = row.rComm;
-                                    miEstado = row.isRecruiterPaid;
-                                    miSolicitado = row.isRecruiterRequested;
-                                  } else if (isUserAdmin) {
-                                    miPorcion = row.totalComm;
-                                    miEstado = row.isFullyPaid;
-                                    miSolicitado = row.isSellerRequested || row.isRecruiterRequested;
-                                  }
-
-                                  const canSelect = !miEstado && !miSolicitado;
-
-                                  return (
-                                    <tr key={idx} className="hover:bg-slate-50/55 dark:hover:bg-slate-800/20">
-                                      {showSelectionCheckboxes && (
-                                        <td className="p-4 text-center">
-                                          {canSelect ? (
-                                            <input
-                                              type="checkbox"
-                                              checked={selectedCommissionsToRequestPayout.includes(row.cliente_id)}
-                                              onChange={(e) => {
-                                                if (e.target.checked) {
-                                                  setSelectedCommissionsToRequestPayout(prev => [...prev, row.cliente_id]);
-                                                } else {
-                                                  setSelectedCommissionsToRequestPayout(prev => prev.filter(id => id !== row.cliente_id));
-                                                }
-                                              }}
-                                              className="rounded border-slate-300"
-                                            />
-                                          ) : (
-                                            <span className="text-slate-300 select-none">-</span>
-                                          )}
-                                        </td>
-                                      )}
-                                      <td className="p-4 space-y-0.5">
-                                        <p className="font-extrabold text-slate-900 dark:text-white">{row.cliente_nombre}</p>
-                                        <p className="text-[10px] text-slate-500 font-medium">{row.plan_nombre} ¬∑ ID: {row.cliente_id}</p>
-                                      </td>
-                                      <td className="p-4">
-                                        <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded font-medium text-slate-600 dark:text-slate-300">
-                                          {activeUserName}
-                                        </span>
-                                      </td>
-                                      <td className="p-4">
-                                        {isCurrentRecruiter ? (
-                                          <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded font-medium" title={row.seller}>
-                                            {row.sellerName}
-                                          </span>
-                                        ) : (
-                                          <span className="text-slate-400 italic text-[11px]">Directo (Sin Red)</span>
-                                        )}
-                                      </td>
-                                      <td className="p-4 space-y-0.5 font-bold">
-                                        <p className="text-slate-900 dark:text-white">${miPorcion.toLocaleString()} ARS</p>
-                                      </td>
-                                      <td className="p-4 text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                          {miEstado ? (
-                                            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 rounded-full font-extrabold text-[10px] uppercase">
-                                              ‚úì Cobrado
-                                            </span>
-                                          ) : miSolicitado ? (
-                                            <span className="px-2.5 py-1 bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-400 rounded-full font-extrabold text-[10px] uppercase flex items-center gap-1">
-                                              ‚è≥ Solicitado
-                                            </span>
-                                          ) : (
-                                            <span className="px-2.5 py-1 bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 rounded-full font-extrabold text-[10px] uppercase">
-                                              ‚óè Pendiente
-                                            </span>
-                                          )}
-
-                                          {miEstado && row.comprobanteImg && (
-                                            <button
-                                              onClick={() => {
-                                                setViewingReceiptUrl(row.comprobanteImg);
-                                                setShowReceiptModal(true);
-                                              }}
-                                              className="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
-                                              title="Ver Comprobante de Pago"
-                                            >
-                                              <Eye size={12} />
-                                            </button>
-                                          )}
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  );
-                                })
-                              ) : (
-                                <tr>
-                                  <td colSpan={5} className="p-8 text-center text-slate-400 space-y-1">
-                                    <Users size={28} className="mx-auto text-slate-300 dark:text-slate-700" />
-                                    <p className="font-bold">Sin Comisiones Encontradas</p>
-                                    <p className="text-[11px] text-slate-500">No hay ventas registradas o liquidadas bajo este criterio.</p>
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 2: MI RED Y RECLUTAMIENTO */}
-                  {finanzasTab === "red" && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      {/* Formulario / Acci√≥n para Reclutar */}
-                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 h-fit">
-                        <div className="space-y-1">
-                          <h3 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5">
-                            ‚ûï Reclutar Nuevo Vendedor
-                          </h3>
-                          <p className="text-xs text-slate-500">
-                            Invita a un nuevo vendedor a unirse a tu red para generar una comisi√≥n pasiva del 20% en cada venta que concrete.
-                          </p>
-                        </div>
-
-                        <div className="space-y-3">
-                          <div className="space-y-1">
-                            <label className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">Nombre Completo</label>
-                            <input
-                              type="text"
-                              value={newInvitedName}
-                              onChange={(e) => setNewInvitedName(e.target.value)}
-                              placeholder="Ej: Juan Perez"
-                              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-950 focus:outline-none dark:text-white"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">Correo Electr√≥nico (Para Login)</label>
-                            <input
-                              type="email"
-                              value={newInvitedEmail}
-                              onChange={(e) => setNewInvitedEmail(e.target.value)}
-                              placeholder="Ej: juan@gmail.com"
-                              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-950 focus:outline-none dark:text-white"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">Contrase√±a de Acceso</label>
-                            <input
-                              type="password"
-                              value={newInvitedPass}
-                              onChange={(e) => setNewInvitedPass(e.target.value)}
-                              placeholder="M√≠nimo 6 caracteres"
-                              className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-950 focus:outline-none dark:text-white"
-                            />
-                          </div>
-
-                          <button
-                            onClick={async () => {
-                              const success = await handleSaveVendedorRelacion(sellerEmailLower, newInvitedEmail, newInvitedName, newInvitedPass);
-                              if (success) {
-                                setNewInvitedEmail("");
-                                setNewInvitedName("");
-                                setNewInvitedPass("");
-                              }
-                            }}
-                            className="w-full py-2.5 bg-slate-900 dark:bg-white hover:bg-slate-850 dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-xl transition-all font-bold text-xs"
-                          >
-                            ‚úì Confirmar y Registrar Vendedor
-                          </button>
-                        </div>
-
-                        {/* Compartir invitaci√≥n de WhatsApp */}
-                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                          <p className="text-[11px] font-bold text-slate-600 dark:text-slate-400">F√≥rmula de Invitaci√≥n WhatsApp:</p>
-                          <div className="p-3 bg-slate-50 dark:bg-slate-950 text-[10px] text-slate-500 rounded-xl font-mono leading-relaxed relative group">
-                            ¬°Hola! Te invito a unirte a nuestro equipo de revendedores de XTV. Reg√≠strate aqu√≠ y empieza a ganar excelentes comisiones. Cont√°ctame para habilitar tu cuenta.
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText("¬°Hola! Te invito a unirte a nuestro equipo de revendedores de XTV. Reg√≠strate aqu√≠ y empieza a ganar excelentes comisiones. Cont√°ctame para habilitar tu cuenta.");
-                                toast.success("¬°Texto de invitaci√≥n copiado!");
-                              }}
-                              className="absolute top-2 right-2 p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors shadow-sm"
-                              title="Copiar texto de invitaci√≥n"
-                            >
-                              <Share2 size={10} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Listado de Mi Red / Vendedores Reclutados */}
-                      <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
-                        <div className="space-y-1">
-                          <h3 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight">
-                            üë• Vendedores en Mi Red
-                          </h3>
-                          <p className="text-xs text-slate-500">
-                            Lista completa de revendedores asociados directamente a tu red que comisionan contigo.
-                          </p>
-                        </div>
-
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                              <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400">
-                                <th className="pb-3 text-[10px] uppercase font-bold">Vendedor</th>
-                                <th className="pb-3 text-[10px] uppercase font-bold">Ventas Totales</th>
-                                <th className="pb-3 text-[10px] uppercase font-bold">Ingreso Pasivo Generado</th>
-                                <th className="pb-3 text-[10px] uppercase font-bold text-right">Acciones</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                              {vendedoresRelaciones.filter(r => isUserAdmin ? true : r.inviter_email.toLowerCase().trim() === sellerEmailLower).length > 0 ? (
-                                vendedoresRelaciones
-                                  .filter(r => isUserAdmin ? true : r.inviter_email.toLowerCase().trim() === sellerEmailLower)
-                                  .map((rel: any, idx: number) => {
-                                    // Calcular ventas y pasivos
-                                    const sellerClients = accounts.filter((acc: any) => (acc.creado_por || "").toLowerCase().trim() === rel.invited_email.toLowerCase().trim());
-                                    
-                                    const totalPassiveCommission = sellerClients.reduce((acc: number, curr: any) => {
-                                      const plan = salePlans.find((p: any) => String(p.id) === String(curr.id_plan_venta));
-                                      const comm = plan && Number(plan.comision) > 0 ? Number(plan.comision) : 5000;
-                                      return acc + Math.round(comm * 0.2);
-                                    }, 0);
-
-                                    return (
-                                      <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10">
-                                        <td className="py-3 space-y-0.5">
-                                          <p className="font-bold text-slate-900 dark:text-white">{rel.invited_email}</p>
-                                          {isUserAdmin && (
-                                            <p className="text-[10px] text-slate-400">Reclutador: {rel.inviter_email}</p>
-                                          )}
-                                        </td>
-                                        <td className="py-3">
-                                          <span className="font-extrabold text-slate-700 dark:text-slate-300">
-                                            {sellerClients.length} Ventas
-                                          </span>
-                                        </td>
-                                        <td className="py-3 font-bold text-indigo-600 dark:text-indigo-400">
-                                          ${totalPassiveCommission.toLocaleString()} ARS
-                                        </td>
-                                        <td className="py-3 text-right">
-                                          {(isUserAdmin || rel.inviter_email.toLowerCase().trim() === sellerEmailLower) && (
-                                            <button
-                                              onClick={() => {
-                                                if (confirm("¬øEst√°s seguro de eliminar esta relaci√≥n de reclutamiento? Esto no eliminar√° el usuario pero cancelar√° la comisi√≥n pasiva.")) {
-                                                  handleDeleteVendedorRelacion(rel.id);
-                                                }
-                                              }}
-                                              className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-colors"
-                                              title="Eliminar Relaci√≥n"
-                                            >
-                                              <Trash2 size={14} />
-                                            </button>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    );
-                                  })
-                              ) : (
-                                <tr>
-                                  <td colSpan={4} className="py-8 text-center text-slate-400 space-y-1">
-                                    <Users size={24} className="mx-auto text-slate-300 dark:text-slate-700" />
-                                    <p className="font-bold">A√∫n no posees vendedores en tu red</p>
-                                    <p className="text-[11px] text-slate-500">Recluta un vendedor usando el formulario de la izquierda.</p>
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 3: LIQUIDAR COMISIONES (SOLO ADMIN) */}
-                  {finanzasTab === "liquidaciones" && isUserAdmin && (
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-6">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="space-y-1">
-                          <h3 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5">
-                            ‚öñÔ∏è Liquidar y Pagar Comisiones
-                          </h3>
-                          <p className="text-xs text-slate-500">
-                            Selecciona m√∫ltiples clientes con comisiones pendientes para liquidarlas al revendedor y al reclutador pasivo correspondientes de una sola vez.
-                          </p>
-                        </div>
-
-                        {selectedCommissionsForPayout.length > 0 && (
-                          <button
-                            onClick={() => {
-                              const selectedRows = allCommissionRows.filter(r => selectedCommissionsForPayout.includes(r.cliente_id));
-                              const totalVend = selectedRows.reduce((sum, r) => sum + (r.isSellerPaid ? 0 : r.vComm), 0);
-                              const totalRecr = selectedRows.reduce((sum, r) => sum + (r.recruiter && !r.isRecruiterPaid ? r.rComm : 0), 0);
-                              
-                              setPayoutPayVendedor(true);
-                              setPayoutPayReclutador(true);
-                              setPayoutOverrideVendedor(String(totalVend));
-                              setPayoutOverrideReclutador(String(totalRecr));
-                              setPayoutNotes("");
-                              setShowPayoutModal(true);
-                            }}
-                            className="px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-850 dark:hover:bg-slate-100 font-extrabold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2"
-                          >
-                            ‚öñÔ∏è Liquidar ({selectedCommissionsForPayout.length}) Seleccionados
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Grilla tabular global de liquidaci√≥n */}
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-xs">
-                          <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 text-slate-400">
-                              <th className="p-3 w-10 text-center">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedCommissionsForPayout.length > 0 && selectedCommissionsForPayout.length === allCommissionRows.filter(r => !r.isFullyPaid).length}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      const unpaids = allCommissionRows.filter(r => !r.isFullyPaid).map(r => r.cliente_id);
-                                      setSelectedCommissionsForPayout(unpaids);
-                                    } else {
-                                      setSelectedCommissionsForPayout([]);
-                                    }
-                                  }}
-                                  className="rounded border-slate-300"
-                                />
-                              </th>
-                              <th className="p-3 text-[10px] uppercase font-bold">Cliente / Plan</th>
-                              <th className="p-3 text-[10px] uppercase font-bold">Vendedor</th>
-                              <th className="p-3 text-[10px] uppercase font-bold">Revendedor</th>
-                              <th className="p-3 text-[10px] uppercase font-bold">Comisi√≥n Vendedor</th>
-                              <th className="p-3 text-[10px] uppercase font-bold">Comisi√≥n Revendedor</th>
-                              <th className="p-3 text-[10px] uppercase font-bold text-right">Estado</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                            {allCommissionRows.length > 0 ? (
-                              allCommissionRows.map((row: any, idx: number) => {
-                                return (
-                                  <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10">
-                                    <td className="p-3 text-center">
-                                      <input
-                                        type="checkbox"
-                                        checked={selectedCommissionsForPayout.includes(row.cliente_id)}
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            setSelectedCommissionsForPayout(prev => [...prev, row.cliente_id]);
-                                          } else {
-                                            setSelectedCommissionsForPayout(prev => prev.filter(id => id !== row.cliente_id));
-                                          }
-                                        }}
-                                        className="rounded border-slate-300"
-                                      />
-                                    </td>
-                                    <td className="p-3 space-y-0.5">
-                                      <p className="font-extrabold text-slate-950 dark:text-white">{row.cliente_nombre}</p>
-                                      <p className="text-[10px] text-slate-500">{row.plan_nombre} ¬∑ ID: {row.cliente_id}</p>
-                                    </td>
-                                    <td className="p-3 space-y-1">
-                                      <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-medium text-slate-600 dark:text-slate-300" title={row.seller}>
-                                        {row.sellerName}
-                                      </span>
-                                      <div className="flex flex-col gap-0.5 text-[9px]">
-                                        {row.isSellerPaid ? (
-                                          <span className="text-emerald-500 font-bold">‚úì Pagado</span>
-                                        ) : (
-                                          <span className="text-amber-500 font-bold">‚óè Pendiente</span>
-                                        )}
-                                        {row.isSellerRequested && !row.isSellerPaid && (
-                                          <span className="px-1.5 py-0.5 bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-400 rounded text-[8px] font-black uppercase tracking-wider w-fit">
-                                            ‚è≥ Solicitado
-                                          </span>
-                                        )}
-                                      </div>
-                                    </td>
-                                    <td className="p-3 space-y-1">
-                                      {row.recruiter ? (
-                                        <>
-                                          <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded text-[10px] font-medium" title={row.recruiter}>
-                                            {row.recruiterName}
-                                          </span>
-                                          <div className="flex flex-col gap-0.5 text-[9px]">
-                                            {row.isRecruiterPaid ? (
-                                              <span className="text-emerald-500 font-bold">‚úì Pagado</span>
-                                            ) : (
-                                              <span className="text-amber-500 font-bold">‚óè Pendiente</span>
-                                            )}
-                                            {row.isRecruiterRequested && !row.isRecruiterPaid && (
-                                              <span className="px-1.5 py-0.5 bg-orange-100 text-orange-800 dark:bg-orange-950/40 dark:text-orange-400 rounded text-[8px] font-black uppercase tracking-wider w-fit">
-                                                ‚è≥ Solicitado
-                                              </span>
-                                            )}
-                                          </div>
-                                        </>
-                                      ) : (
-                                        <span className="text-slate-400 italic text-[11px]">Directo (Sin Red)</span>
-                                      )}
-                                    </td>
-                                    <td className="p-3 font-bold text-slate-900 dark:text-white">
-                                      ${row.vComm.toLocaleString()} ARS
-                                    </td>
-                                    <td className="p-3 font-bold text-slate-900 dark:text-white">
-                                      ${row.rComm.toLocaleString()} ARS
-                                    </td>
-                                    <td className="p-3 text-right">
-                                      <div className="flex items-center justify-end gap-2">
-                                        {row.isFullyPaid ? (
-                                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 rounded-full font-black text-[9px] uppercase">
-                                            Completo
-                                          </span>
-                                        ) : (
-                                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 rounded-full font-black text-[9px] uppercase">
-                                            Parcial / Pendiente
-                                          </span>
-                                        )}
-
-                                        <button
-                                          onClick={() => openReceiptDetails(row, false, allCommissionRows)}
-                                          className="px-2 py-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 transition-all flex items-center gap-1 font-bold text-[10px]"
-                                          title="Ver Comprobante y Detalle Desglosado por Cliente"
-                                        >
-                                          <Eye size={12} />
-                                          <span>Detalle</span>
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })
-                            ) : (
-                              <tr>
-                                <td colSpan={7} className="p-12 text-center text-slate-400">
-                                  <Users size={32} className="mx-auto mb-2 text-slate-300 dark:text-slate-700" />
-                                  <p className="font-bold">No hay registros de ventas para liquidar</p>
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Modal de Liquidaci√≥n de Comisiones Seleccionadas */}
-                      {showPayoutModal && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 relative">
-                            <button
-                              onClick={() => setShowPayoutModal(false)}
-                              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg"
-                            >
-                              <X size={18} />
-                            </button>
-
-                            <div className="space-y-1">
-                              <h4 className="font-extrabold text-sm text-slate-900 dark:text-white tracking-tight">
-                                ‚öñÔ∏è Confirmar Liquidaci√≥n Masiva
-                              </h4>
-                              <p className="text-xs text-slate-500">
-                                Est√°s liquidando comisiones para {selectedCommissionsForPayout.length} clientes. Puedes sobreescribir los montos reales de pago a continuaci√≥n.
-                              </p>
-                            </div>
-
-                            <div className="space-y-3">
-                              <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800/60 space-y-3">
-                                <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 block mb-1">
-                                  Fracciones a Liquidar en este Pago:
-                                </span>
-
-                                {/* VENDEDORES SELECTION */}
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <label className="flex items-center gap-2 cursor-pointer text-xs font-extrabold text-slate-900 dark:text-white select-none">
-                                      <input
-                                        type="checkbox"
-                                        checked={payoutPayVendedor}
-                                        onChange={(e) => setPayoutPayVendedor(e.target.checked)}
-                                        className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 w-4 h-4"
-                                      />
-                                      <span>‚úì Liquidar Vendedores</span>
-                                    </label>
-                                    <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-lg">
-                                      ARS ${Number(payoutOverrideVendedor).toLocaleString()}
-                                    </span>
-                                  </div>
-                                  {payoutPayVendedor && (
-                                    <div className="pl-6 space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Monto Manual Ajustado (Opcional)</label>
-                                      <input
-                                        type="number"
-                                        value={payoutOverrideVendedor}
-                                        onChange={(e) => setPayoutOverrideVendedor(e.target.value)}
-                                        className="w-full px-2.5 py-1.5 border border-slate-200 dark:border-slate-850 rounded-lg text-xs bg-white dark:bg-slate-950 focus:outline-none dark:text-white"
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="border-t border-slate-150 dark:border-slate-800/60 my-2"></div>
-
-                                {/* REVENDEDORES SELECTION */}
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <label className="flex items-center gap-2 cursor-pointer text-xs font-extrabold text-slate-900 dark:text-white select-none">
-                                      <input
-                                        type="checkbox"
-                                        checked={payoutPayReclutador}
-                                        onChange={(e) => setPayoutPayReclutador(e.target.checked)}
-                                        className="rounded border-slate-300 text-slate-900 focus:ring-slate-500 w-4 h-4"
-                                      />
-                                      <span>‚úì Liquidar Revendedores</span>
-                                    </label>
-                                    <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 rounded-lg">
-                                      ARS ${Number(payoutOverrideReclutador).toLocaleString()}
-                                    </span>
-                                  </div>
-                                  {payoutPayReclutador && (
-                                    <div className="pl-6 space-y-1">
-                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Monto Manual Ajustado (Opcional)</label>
-                                      <input
-                                        type="number"
-                                        value={payoutOverrideReclutador}
-                                        onChange={(e) => setPayoutOverrideReclutador(e.target.value)}
-                                        className="w-full px-2.5 py-1.5 border border-slate-200 dark:border-slate-850 rounded-lg text-xs bg-white dark:bg-slate-950 focus:outline-none dark:text-white"
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">Notas de Liquidaci√≥n</label>
-                                <textarea
-                                  value={payoutNotes}
-                                  onChange={(e) => setPayoutNotes(e.target.value)}
-                                  placeholder="Ej: Pago realizado via transferencia bancaria."
-                                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs bg-white dark:bg-slate-950 focus:outline-none dark:text-white h-20 resize-none"
-                                />
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400">Captura de Comprobante (Opcional)</label>
-                                <div className="mt-1 flex flex-col gap-2">
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) {
-                                        const reader = new FileReader();
-                                        reader.onloadend = () => {
-                                          setPayoutReceiptImage(reader.result as string);
-                                        };
-                                        reader.readAsDataURL(file);
-                                      }
-                                    }}
-                                    className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 dark:file:bg-slate-800 dark:file:text-slate-300"
-                                  />
-                                  {payoutReceiptImage && (
-                                    <div className="relative w-full h-32 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-center group">
-                                      <img
-                                        src={payoutReceiptImage}
-                                        alt="Vista previa del comprobante"
-                                        className="max-h-full max-w-full object-contain"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => setPayoutReceiptImage("")}
-                                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-lg hover:bg-red-600 shadow-md transition-all text-[10px] font-bold"
-                                      >
-                                        Eliminar
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="pt-2 flex gap-3">
-                                <button
-                                  onClick={() => {
-                                    setPayoutReceiptImage("");
-                                    setShowPayoutModal(false);
-                                  }}
-                                  className="flex-1 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400"
-                                >
-                                  Cancelar
-                                </button>
-                                <button
-                                  onClick={async () => {
-                                    const selectedRows = allCommissionRows.filter(r => selectedCommissionsForPayout.includes(r.cliente_id));
-                                    
-                                    for (const r of selectedRows) {
-                                      await handleSaveCommissionPayout(
-                                        r.cliente_id,
-                                        r.cliente_nombre,
-                                        r.plan_nombre,
-                                        r.seller,
-                                        r.recruiter,
-                                        r.totalComm,
-                                        r.vComm,
-                                        r.rComm,
-                                        payoutPayVendedor,
-                                        payoutPayReclutador,
-                                        payoutNotes,
-                                        payoutReceiptImage
-                                      );
-                                    }
-                                    
-                                    setSelectedCommissionsForPayout([]);
-                                    setPayoutReceiptImage("");
-                                    setShowPayoutModal(false);
-                                  }}
-                                  className="flex-1 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-850 dark:hover:bg-slate-100 rounded-xl text-xs font-bold"
-                                >
-                                  ‚úì Confirmar Pago
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Helper Function para formatear texto de comprobante */}
-                      {(() => {
-                        return null;
-                      })()}
-                      {showReceiptModal && (
-                        (() => {
-                          const generateReceiptFormattedText = (details: any) => {
-                            if (!details) return '';
-                            let txt = `üßæ *COMPROBANTE DE LIQUIDACI√ìN DE COMISIONES*\n`;
-                            txt += `üë§ Usuario: ${details.usuarioNombre || 'N/A'}\n`;
-                            if (details.usuarioRol) txt += `üìã Rol: ${details.usuarioRol}\n`;
-                            if (details.fechaEmision) txt += `üìÖ Fecha: ${details.fechaEmision}\n`;
-                            txt += `\n‚úÖ *CLIENTES COBRADOS / INCLUIDOS:*\n`;
-                            if (details.detallesCobrados?.length > 0) {
-                              details.detallesCobrados.forEach((item: any, idx: number) => {
-                                txt += `${idx + 1}. ${item.cliente_nombre} (${item.plan_nombre}): $${item.monto_abonado?.toLocaleString()} ARS\n`;
-                              });
-                            }
-                            txt += `\nüí∞ *TOTAL ABONADO:* $${details.totalCobrado?.toLocaleString() || 0} ARS\n`;
-                            if (details.detallesPendientes?.length > 0) {
-                              txt += `\n‚ö†Ô∏è *PENDIENTE TOTAL:* $${details.totalPendiente?.toLocaleString() || 0} ARS\n`;
-                            }
-                            return txt;
-                          };
-
-                          return (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-                          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl p-6 shadow-2xl space-y-4 relative max-h-[90vh] overflow-y-auto">
-                            <button
-                              onClick={() => {
-                                setShowReceiptModal(false);
-                                setViewingReceiptUrl("");
-                                setViewingReceiptDetails(null);
-                              }}
-                              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg bg-slate-100 dark:bg-slate-800 transition-colors"
-                            >
-                              <X size={18} />
-                            </button>
-
-                            <div className="space-y-1 pr-6">
-                              <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-400 rounded-md text-[10px] font-black uppercase tracking-wider">
-                                üßæ Comprobante Oficial de Liquidaci√≥n
-                              </span>
-                              <h4 className="font-black text-lg text-slate-950 dark:text-white tracking-tight flex items-center gap-2">
-                                {viewingReceiptDetails?.usuarioNombre || "Usuario XTV"}
-                              </h4>
-                              <p className="text-xs text-slate-500 flex items-center gap-2">
-                                <span>Rol: <strong className="text-slate-700 dark:text-slate-300">{viewingReceiptDetails?.usuarioRol || "Vendedor"}</strong></span>
-                                <span>¬∑</span>
-                                <span>Email: <strong className="text-slate-700 dark:text-slate-300">{viewingReceiptDetails?.usuarioEmail}</strong></span>
-                              </p>
-                              <p className="text-[10px] text-slate-400">
-                                Emitido: {viewingReceiptDetails?.fechaEmision || new Date().toLocaleString()} ¬∑ ID: {viewingReceiptDetails?.comprobanteId || "CMP-0001"}
-                              </p>
-                            </div>
-
-                            {/* TABLA DE CLIENTES COBRADOS EN ESTA LIQUIDACI√ìN */}
-                            <div className="space-y-2 border-t border-slate-150 dark:border-slate-800 pt-3">
-                              <div className="flex items-center justify-between">
-                                <h5 className="text-xs font-black uppercase text-slate-900 dark:text-white tracking-wider flex items-center gap-1.5">
-                                  <span>‚úÖ Clientes Incluidos en este Pago / Liquidaci√≥n</span>
-                                </h5>
-                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                  Total Abonado: ${viewingReceiptDetails?.totalCobrado?.toLocaleString() || 0} ARS
-                                </span>
-                              </div>
-
-                              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden text-xs">
-                                <table className="w-full text-left">
-                                  <thead className="bg-slate-50 dark:bg-slate-850 border-b border-slate-200 dark:border-slate-800 text-[10px] font-extrabold text-slate-500 uppercase">
-                                    <tr>
-                                      <th className="p-2.5">Cliente</th>
-                                      <th className="p-2.5">Plan</th>
-                                      <th className="p-2.5 text-right">Comisi√≥n Total</th>
-                                      <th className="p-2.5 text-right">Monto Abonado</th>
-                                      <th className="p-2.5 text-right">Saldo Restante</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                    {viewingReceiptDetails?.detallesCobrados?.length > 0 ? (
-                                      viewingReceiptDetails.detallesCobrados.map((item: any, i: number) => (
-                                        <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                                          <td className="p-2.5 font-extrabold text-slate-900 dark:text-white">
-                                            {item.cliente_nombre}
-                                            <span className="block text-[9px] font-normal text-slate-400">ID: {item.cliente_id}</span>
-                                          </td>
-                                          <td className="p-2.5 text-slate-600 dark:text-slate-400">{item.plan_nombre}</td>
-                                          <td className="p-2.5 text-right font-semibold text-slate-700 dark:text-slate-300">
-                                            ${item.comision_total?.toLocaleString()}
-                                          </td>
-                                          <td className="p-2.5 text-right font-black text-emerald-600 dark:text-emerald-400">
-                                            ${item.monto_abonado?.toLocaleString()}
-                                          </td>
-                                          <td className="p-2.5 text-right font-bold">
-                                            {item.saldo_restante === 0 ? (
-                                              <span className="text-emerald-500 text-[10px] uppercase font-black">‚úì Saldado</span>
-                                            ) : (
-                                              <span className="text-amber-500 text-[10px] uppercase font-black">${item.saldo_restante?.toLocaleString()}</span>
-                                            )}
-                                          </td>
-                                        </tr>
-                                      ))
-                                    ) : (
-                                      <tr>
-                                        <td colSpan={5} className="p-4 text-center text-slate-400 italic">No hay clientes espec√≠ficos asignados</td>
-                                      </tr>
-                                    )}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-
-                            {/* TABLA DE CLIENTES CON PAGO PENDIENTE O PARCIAL DEL MISMO USUARIO */}
-                            {viewingReceiptDetails?.detallesPendientes?.length > 0 && (
-                              <div className="space-y-2 border-t border-slate-150 dark:border-slate-800 pt-3">
-                                <div className="flex items-center justify-between">
-                                  <h5 className="text-xs font-black uppercase text-amber-600 dark:text-amber-400 tracking-wider flex items-center gap-1.5">
-                                    <span>‚ö†Ô∏è Clientes del Usuario Faltantes por Cobrar / Pendientes</span>
-                                  </h5>
-                                  <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                                    Pendiente Total: ${viewingReceiptDetails?.totalPendiente?.toLocaleString()} ARS
-                                  </span>
-                                </div>
-
-                                <div className="border border-amber-200 dark:border-amber-950/60 rounded-xl overflow-hidden text-xs bg-amber-50/30 dark:bg-amber-950/10">
-                                  <table className="w-full text-left">
-                                    <thead className="bg-amber-100/50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/40 text-[10px] font-extrabold text-amber-800 dark:text-amber-400 uppercase">
-                                      <tr>
-                                        <th className="p-2.5">Cliente</th>
-                                        <th className="p-2.5">Plan</th>
-                                        <th className="p-2.5 text-right">Comisi√≥n Total</th>
-                                        <th className="p-2.5 text-right">Ya Abonado</th>
-                                        <th className="p-2.5 text-right">Saldo Pendiente</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-amber-100 dark:divide-amber-900/30">
-                                      {viewingReceiptDetails.detallesPendientes.map((item: any, i: number) => (
-                                        <tr key={i} className="hover:bg-amber-100/30 dark:hover:bg-amber-950/20">
-                                          <td className="p-2.5 font-bold text-slate-900 dark:text-white">
-                                            {item.cliente_nombre}
-                                            <span className="block text-[9px] font-normal text-slate-400">ID: {item.cliente_id}</span>
-                                          </td>
-                                          <td className="p-2.5 text-slate-600 dark:text-slate-400">{item.plan_nombre}</td>
-                                          <td className="p-2.5 text-right font-semibold text-slate-700 dark:text-slate-300">
-                                            ${item.comision_total?.toLocaleString()}
-                                          </td>
-                                          <td className="p-2.5 text-right font-semibold text-slate-500">
-                                            ${item.monto_abonado?.toLocaleString()}
-                                          </td>
-                                          <td className="p-2.5 text-right font-black text-amber-600 dark:text-amber-400">
-                                            ${item.saldo_restante?.toLocaleString()}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* COMPROBANTE DE IMAGEN SINO */}
-                            {viewingReceiptUrl && (
-                              <div className="space-y-1.5 border-t border-slate-150 dark:border-slate-800 pt-3">
-                                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                                  üì∑ Captura de Transferencia / Garant√≠a Adjunta
-                                </span>
-                                <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-center max-h-[300px] p-2">
-                                  <img
-                                    src={viewingReceiptUrl}
-                                    alt="Comprobante de Pago Adjunto"
-                                    className="max-h-[280px] max-w-full object-contain rounded-lg"
-                                  />
-                                </div>
-                              </div>
-                            )}
-
-                            {/* BOTONES DE COMPARTIR Y ACCI√ìN */}
-                            <div className="pt-2 flex flex-wrap gap-2">
-                              <button
-                                onClick={() => {
-                                  const text = generateReceiptFormattedText(viewingReceiptDetails);
-                                  navigator.clipboard.writeText(text);
-                                  toast.success("Resumen formateado copiado al portapapeles.");
-                                }}
-                                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-extrabold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5"
-                              >
-                                üìã Copiar Resumen
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  const text = generateReceiptFormattedText(viewingReceiptDetails);
-                                  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
-                                }}
-                                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20"
-                              >
-                                üí¨ Compartir en WhatsApp
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setShowReceiptModal(false);
-                                  setViewingReceiptUrl("");
-                                  setViewingReceiptDetails(null);
-                                }}
-                                className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-extrabold text-xs rounded-xl transition-all"
-                              >
-                                Entendido
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                          );
-                        })()
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-          {/* F. SECCI√ìN DE TUTORIALES Y RESPUESTAS R√ÅPIDAS */}
-          {currentMenu === "tutoriales" &&
-            (() => {
-              // Obtener herencia de roles para filtrar de forma jer√°rquica
-              const savedInheritance = localStorage.getItem('g3d_roles_inheritance');
-              const roleInheritance = savedInheritance ? JSON.parse(savedInheritance) : {};
-
-              const isDescendantRole = (child: string, parent: string): boolean => {
-                if (!child || !parent) return false;
-                let current = child.trim().toLowerCase();
-                const p = parent.trim().toLowerCase();
-                if (current === p) return false;
-                let visited = new Set<string>();
-                while (current && !visited.has(current)) {
-                  visited.add(current);
-                  const matchedKey = Object.keys(roleInheritance).find(k => k.trim().toLowerCase() === current);
-                  if (!matchedKey) break;
-                  const parentRole = roleInheritance[matchedKey];
-                  if (!parentRole) break;
-                  const parentLower = parentRole.trim().toLowerCase();
-                  if (parentLower === p) return true;
-                  current = parentLower;
-                }
-                return false;
-              };
-
-              const currentUserRole = simulatedRole || userRole || "";
-
-              // Filtrar seg√∫n permisos de visibilidad de clientes
-              const myClients = accounts.filter((acc: any) => {
-                if (isAdmin) return true;
-
-                const creadoPorLower = (acc.creado_por || "").trim().toLowerCase();
-                const userEmailLower = (user?.email || "").trim().toLowerCase();
-
-                // Caso 1: Es due√±o
-                if (creadoPorLower === userEmailLower) return true;
-
-                // Caso 2: Permiso para ver clientes de roles hijo
-                if (hasPermission("Iptv.Clientes.VerHijos")) {
-                  const creatorUser = panelUsers.find(
-                    (u: any) => u.usuario.trim().toLowerCase() === creadoPorLower
-                  );
-                  const creatorRole = creatorUser ? creatorUser.rol || "" : "";
-                  if (isDescendantRole(creatorRole, currentUserRole)) {
-                    return true;
-                  }
-                }
-
-                // Caso 3: Permiso para ver solo propios (si no se cumple lo anterior)
-                if (hasPermission("Iptv.Clientes.VerPropios")) {
-                  return creadoPorLower === userEmailLower;
-                }
-
-                // Por defecto, si tiene acceso general de Ver pero no restricciones, puede ver todo
-                return true;
-              });
-
-              const searchedClients = myClients.filter((acc: any) => {
-                const term = tutorialSearchTerm.toLowerCase().trim();
-                if (!term) return true;
-                return (
-                  (acc.nombre_completo || "").toLowerCase().includes(term) ||
-                  (acc.username || "").toLowerCase().includes(term) ||
-                  (acc.celular || "").toLowerCase().includes(term)
-                );
-              });
-
-              // activeClient ya no toma por defecto searchedClients[0] si tutorialClient es null
-              const activeClient = tutorialClient;
-
-              const customTemplates = systemConfig?.whatsapp_templates || {};
-
-              const quickTemplates = [
-                {
-                  id: "bienvenida",
-                  title: "üé¨ Bienvenida Oficial XTV",
-                  description: "Mensaje completo de bienvenida con credenciales, link de descarga de la app y pasos para ingresar.",
-                  requiresClient: true,
-                  getContent: (client?: any) => {
-                    if (!client) return "";
-                    const text = customTemplates.bienvenida || DEFAULT_WHATSAPP_TEMPLATES.bienvenida;
-                    return formatTemplateText(text, client);
-                  }
-                },
-                {
-                  id: "credenciales_rapidas",
-                  title: "‚ö° Datos de Acceso R√°pidos",
-                  description: "Formato s√∫per compacto y directo, ideal para clientes experimentados que solo necesitan las credenciales de ingreso.",
-                  requiresClient: true,
-                  getContent: (client?: any) => {
-                    if (!client) return "";
-                    const text = customTemplates.credenciales_rapidas || DEFAULT_WHATSAPP_TEMPLATES.credenciales_rapidas;
-                    return formatTemplateText(text, client);
-                  }
-                },
-                {
-                  id: "recordatorio",
-                  title: "‚ö†Ô∏è Recordatorio de Pr√≥ximo Vencimiento",
-                  description: "Mensaje amigable para recordar el vencimiento de la cuenta e incentivar la renovaci√≥n r√°pida.",
-                  requiresClient: true,
-                  getContent: (client?: any) => {
-                    if (!client) return "";
-                    const text = customTemplates.recordatorio || DEFAULT_WHATSAPP_TEMPLATES.recordatorio;
-                    return formatTemplateText(text, client);
-                  }
-                },
-                {
-                  id: "guia_descarga_general",
-                  title: "üì• Descarga e Instalaci√≥n de XTV (General)",
-                  description: "Mensaje informativo para compartir con cualquier interesado con los enlaces de descarga directa y de soporte.",
-                  requiresClient: false,
-                  getContent: (client?: any) => {
-                    const text = customTemplates.guia_descarga_general || DEFAULT_WHATSAPP_TEMPLATES.guia_descarga_general;
-                    return formatTemplateText(text, client);
-                  }
-                },
-                {
-                  id: "metodos_pago",
-                  title: "üí≥ Informaci√≥n de Pago y Renovaci√≥n (Vendedor)",
-                  description: "Mensaje con los datos del vendedor para recibir pagos de renovaciones o activaciones de planes.",
-                  requiresClient: false,
-                  getContent: (client?: any) => {
-                    const text = customTemplates.metodos_pago || DEFAULT_WHATSAPP_TEMPLATES.metodos_pago;
-                    return formatTemplateText(text, client);
-                  }
-                },
-                {
-                  id: "smart_tv_gen",
-                  title: "üì∫ Instrucciones Generales para Smart TV",
-                  description: "Mensaje explicativo para Smart TVs sobre c√≥mo instalar aplicaciones IPTV compatibles.",
-                  requiresClient: false,
-                  getContent: (client?: any) => {
-                    const text = customTemplates.smart_tv_gen || DEFAULT_WHATSAPP_TEMPLATES.smart_tv_gen;
-                    return formatTemplateText(text, client);
-                  }
-                },
-                {
-                  id: "firestick_gen",
-                  title: "üî• Gu√≠a de Instalaci√≥n para Amazon Fire Stick / Android TV",
-                  description: "Gu√≠a paso a paso sobre c√≥mo instalar XTV en dispositivos de streaming sin necesidad de cliente seleccionado.",
-                  requiresClient: false,
-                  getContent: (client?: any) => {
-                    const text = customTemplates.firestick_gen || DEFAULT_WHATSAPP_TEMPLATES.firestick_gen;
-                    return formatTemplateText(text, client);
-                  }
-                }
-              ];
-
-              return (
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-md animate-fade-in">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-slate-150 dark:border-slate-800 pb-5 gap-4">
-                    <div>
-                      <h3 className="text-lg font-black uppercase text-slate-800 dark:text-white flex items-center gap-2 font-sans">
-                        <span>üìñ Tutoriales y Respuestas R√°pidas</span>
-                        <span className="text-[10px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full lowercase font-bold tracking-normal normal-case">activo</span>
-                      </h3>
-                      <p className="text-slate-500 text-xs mt-1">
-                        Selecciona una l√≠nea de cliente en el men√∫ de la izquierda para generar respuestas personalizadas de acceso, o utiliza los tutoriales generales directamente.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    {/* COLUMNA IZQUIERDA: SELECCIONAR CLIENTE */}
-                    <div className="lg:col-span-4 space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                          Buscar L√≠nea de Cliente IPTV
-                        </label>
-                        <div className="relative">
-                          <Search
-                            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                            size={14}
-                          />
-                          <input
-                            type="text"
-                            placeholder="Nombre, usuario o celular de la l√≠nea..."
-                            value={tutorialSearchTerm}
-                            onChange={(e) => setTutorialSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800/40 text-xs rounded-xl focus:outline-none ring-1 ring-slate-200 dark:ring-slate-800 border-none font-semibold text-slate-800 dark:text-slate-100 placeholder-slate-400"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider block">
-                          L√≠neas de Clientes ({searchedClients.length})
-                        </label>
-                        <div className="max-h-[380px] overflow-y-auto border border-slate-100 dark:border-slate-800 rounded-2xl divide-y divide-slate-100 dark:divide-slate-800 bg-slate-50/30 dark:bg-slate-900/10">
-                          {searchedClients.length > 0 ? (
-                            searchedClients.map((c: any) => {
-                              const isSelected = activeClient?.username === c.username;
-                              return (
-                                <button
-                                  key={c.username}
-                                  onClick={() => setTutorialClient(isSelected ? null : c)}
-                                  className={`w-full text-left p-3 flex flex-col gap-1 transition-all hover:bg-slate-50 dark:hover:bg-slate-850 ${
-                                    isSelected
-                                      ? "bg-indigo-50/70 dark:bg-indigo-950/20 border-l-4 border-indigo-600"
-                                      : "border-l-4 border-transparent"
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between w-full">
-                                    <span className="font-bold text-xs text-slate-900 dark:text-white truncate max-w-[150px]">
-                                      {c.nombre_completo || "Cliente VIP"}
-                                    </span>
-                                    <span className="font-mono text-[9px] font-bold text-cyan-600 dark:text-cyan-400 truncate max-w-[100px]">
-                                      @{c.username}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-between text-[10px] text-slate-400">
-                                    <span>üìû {c.celular || "Sin celular"}</span>
-                                    {c.fecha_vencimiento && (
-                                      <span className="font-medium text-[9px]">
-                                        üìÖ {new Date(c.fecha_vencimiento).toLocaleDateString()}
-                                      </span>
-                                    )}
-                                  </div>
-                                </button>
-                              );
-                            })
-                          ) : (
-                            <div className="p-6 text-center text-slate-400 text-xs">
-                              No tienes l√≠neas de clientes que coincidan con la b√∫squeda.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* COLUMNA DERECHA: RESPUESTAS R√ÅPIDAS */}
-                    <div className="lg:col-span-8 space-y-6">
-                      {activeClient ? (
-                        /* Resumen de la L√≠nea Seleccionada */
-                        <div className="bg-indigo-50/50 dark:bg-indigo-950/20 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-950 flex flex-wrap items-center justify-between gap-4 text-left">
-                          <div className="flex-1 min-w-[200px]">
-                            <p className="text-[10px] uppercase font-black text-indigo-600 dark:text-indigo-400 tracking-wider flex items-center gap-1.5">
-                              <span className="size-2 rounded-full bg-indigo-500 animate-pulse"></span>
-                              L√≠nea de Cliente Seleccionada
-                            </p>
-                            <h4 className="text-sm font-black text-slate-800 dark:text-white font-sans mt-0.5">
-                              {activeClient.nombre_completo || "Cliente VIP"}
-                            </h4>
-                            <p className="text-slate-500 font-mono text-[10px] mt-0.5">
-                              Usuario: <strong className="text-cyan-600">@{activeClient.username}</strong> | Clave: <strong>{activeClient.password}</strong>
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {activeClient.celular && (
-                              <a
-                                href={`https://wa.me/${activeClient.celular.replace(/\D/g, "")}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-xl transition-all shadow-sm hover:scale-[1.01]"
-                              >
-                                <MessageSquare size={13} />
-                                <span>Abrir WhatsApp</span>
-                              </a>
-                            )}
-                            <button
-                              onClick={() => setTutorialClient(null)}
-                              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-600 dark:text-slate-300 text-[10px] font-bold rounded-xl transition-all"
-                            >
-                              Quitar filtro √ó
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        /* Informaci√≥n de visualizaci√≥n general */
-                        <div className="bg-amber-500/5 dark:bg-amber-500/10 p-4 rounded-2xl border border-amber-500/10 dark:border-amber-500/20 text-left">
-                          <p className="text-xs text-amber-800 dark:text-amber-400 font-bold flex items-center gap-1.5">
-                            <span>üí°</span>
-                            <span>Visualizando Respuestas R√°pidas Generales</span>
-                          </p>
-                          <p className="text-[11px] text-slate-600 dark:text-slate-200 mt-1">
-                            Selecciona una l√≠nea de cliente en el men√∫ de la izquierda para habilitar las respuestas con credenciales, listas de reproducci√≥n M3U y recordatorios de vencimiento personalizados.
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Lista de Plantillas */}
-                      <div className="space-y-4">
-                        {(() => {
-                          const templatesToShow = quickTemplates.filter(
-                            (t) => !t.requiresClient || activeClient !== null
-                          );
-
-                          return templatesToShow.map((t) => {
-                            const renderedText = t.getContent(activeClient);
-                            return (
-                              <div
-                                key={t.id}
-                                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm"
-                              >
-                                {/* Cabecera de la plantilla */}
-                                <div className="p-4 bg-slate-50/50 dark:bg-slate-850/20 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-                                  <div className="text-left">
-                                    <div className="flex items-center gap-2">
-                                      <h5 className="text-xs font-extrabold text-slate-800 dark:text-slate-100 font-sans">
-                                        {t.title}
-                                      </h5>
-                                      {t.requiresClient && (
-                                        <span className="text-[8px] uppercase bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded font-black tracking-wider">
-                                          Cliente
-                                        </span>
-                                      )}
-                                    </div>
-                                    <p className="text-[10px] text-slate-500 mt-0.5">
-                                      {t.description}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {/* Bot√≥n de Editar Plantilla */}
-                                    <button
-                                      onClick={() => {
-                                        setEditingTemplateId(t.id);
-                                        const customTpl = systemConfig?.whatsapp_templates || {};
-                                        setEditingTemplateText(customTpl[t.id] || DEFAULT_WHATSAPP_TEMPLATES[t.id as keyof typeof DEFAULT_WHATSAPP_TEMPLATES] || "");
-                                      }}
-                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-bold rounded-xl transition-all"
-                                    >
-                                      <Pencil size={11} />
-                                      <span>Editar</span>
-                                    </button>
-
-                                    {/* Copiar con bot√≥n */}
-                                    <button
-                                      onClick={() => {
-                                        copyToClipboard(
-                                          renderedText,
-                                          "¬°Respuesta r√°pida copiada con √©xito!"
-                                        );
-                                      }}
-                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold rounded-xl transition-all hover:scale-[1.01]"
-                                    >
-                                      <Copy size={11} />
-                                      <span>Copiar</span>
-                                    </button>
-                                    {/* Compartir por WhatsApp directo si hay celular */}
-                                    {activeClient?.celular && (
-                                      <a
-                                        href={`https://wa.me/${activeClient.celular.replace(/\D/g, "")}?text=${encodeURIComponent(renderedText)}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold rounded-xl transition-all hover:scale-[1.01]"
-                                      >
-                                        <MessageSquare size={11} />
-                                        <span>Enviar WA</span>
-                                      </a>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Cuerpo / Previsualizaci√≥n u Hoja de Edici√≥n */}
-                                <div className="p-4 bg-slate-50/20 text-left">
-                                  {editingTemplateId === t.id ? (
-                                    <div className="space-y-4">
-                                      <div className="relative">
-                                        <textarea
-                                          value={editingTemplateText}
-                                          onChange={(e) => setEditingTemplateText(e.target.value)}
-                                          rows={10}
-                                          className="w-full p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs rounded-xl focus:outline-none ring-1 ring-slate-200 dark:ring-slate-800 font-mono text-slate-800 dark:text-slate-100 leading-relaxed font-semibold"
-                                          placeholder="Escribe el texto de tu plantilla aqu√≠..."
-                                        />
-                                        <div className="absolute bottom-2 right-2 text-[9px] font-bold text-slate-400 bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-800">
-                                          {editingTemplateText.length} caracteres
-                                        </div>
-                                      </div>
-
-                                      {/* Tags/badges interactivos de variables de reemplazo */}
-                                      <div className="space-y-1.5">
-                                        <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider block">
-                                          üí° Haz clic para insertar variables en el texto:
-                                        </span>
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {[
-                                            { code: "{nombre}", label: "Nombre Cliente" },
-                                            { code: "{usuario}", label: "Usuario" },
-                                            { code: "{contrasena}", label: "Contrase√±a" },
-                                            { code: "{servidor}", label: "Servidor URL" },
-                                            { code: "{m3u_url}", label: "Playlist M3U" },
-                                            { code: "{link_descarga}", label: "Link Descarga App" },
-                                            { code: "{fecha_vencimiento}", label: "Vencimiento" },
-                                            { code: "{nota}", label: "Nota Admin" },
-                                            { code: "{whatsapp}", label: "WA Soporte" },
-                                            { code: "{tienda_url}", label: "Tienda Web" }
-                                          ].map((varItem) => (
-                                            <button
-                                              key={varItem.code}
-                                              type="button"
-                                              onClick={() => {
-                                                setEditingTemplateText(prev => prev + varItem.code);
-                                              }}
-                                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-bold rounded-lg transition-all"
-                                            >
-                                              <span className="text-indigo-600 dark:text-indigo-400 font-mono font-black">{varItem.code}</span>
-                                              <span className="text-slate-400 ml-1 text-[9px]">({varItem.label})</span>
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </div>
-
-                                      {/* Controles del editor */}
-                                      <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-850">
-                                        <button
-                                          onClick={() => handleSaveTemplate(t.id, editingTemplateText)}
-                                          className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-xl transition-all shadow-sm"
-                                        >
-                                          <Check size={12} />
-                                          <span>Guardar Plantilla</span>
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            setEditingTemplateId(null);
-                                            setEditingTemplateText("");
-                                          }}
-                                          className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-bold rounded-xl transition-all"
-                                        >
-                                          <X size={12} />
-                                          <span>Cancelar</span>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <pre className="font-mono text-[10px] text-slate-700 dark:text-slate-300 whitespace-pre-wrap max-h-[160px] overflow-y-auto leading-relaxed p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 rounded-xl font-semibold">
-                                      {renderedText}
-                                    </pre>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          });
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-        </div>
-      )}
-
-      {/* SECCI√ìN DE INVITACI√ìN - MINIMEN√ö DE SOCIOS Y CLIENTES XTV */}
-      {currentMenu === "invitacion" && (
-        <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 animate-fade-in text-slate-800 dark:text-slate-100">
-          {/* Cabecera / Retorno */}
-          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-            <button
-              onClick={() => {
-                setInvMenuMode(null);
-                setInvVendNombre("");
-                setInvVendTelefono("");
-                setInvVendDireccion("");
-                setInvVendUserId("");
-                setInvVendCreated(null);
-                setInvCliNombre("");
-                setInvCliTelefono("");
-                setInvCliCreated(null);
-                setCurrentMenu("inicio");
-              }}
-              className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors bg-slate-100 dark:bg-slate-800 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:scale-[1.01]"
-            >
-              <span>‚Üê Volver al Panel de Inicio</span>
-            </button>
-            <div className="text-right">
-              <h2 className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                Centro de Invitaciones XTV
-              </h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase">
-                Sumar Vendedores y Clientes
-              </p>
-            </div>
-          </div>
-
-          {/* Men√∫ Principal de Invitaci√≥n o Modos del Formulario */}
-          {!invMenuMode ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-              {/* Tarjeta de Invitaci√≥n a Vendedor */}
-              <button
-                onClick={() => setInvMenuMode('vendedor')}
-                className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl text-left hover:border-indigo-550 dark:hover:border-indigo-500 hover:shadow-xl hover:shadow-indigo-500/5 transition-all hover:-translate-y-1 duration-300"
-              >
-                <div className="h-12 w-12 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform mb-5">
-                  <UserCheck size={24} />
-                </div>
-                <h3 className="text-base font-extrabold text-slate-900 dark:text-white mb-2">
-                  Invitar a ser Vendedor
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
-                  Suma nuevos revendedores e intermediarios bajo tu red jer√°rquica. Podr√°s asignarles cr√©ditos, auditar sus movimientos y ganar comisiones por sus ventas.
-                </p>
-                <div className="mt-5 inline-flex items-center gap-1 text-[11px] font-extrabold text-indigo-600 dark:text-indigo-400">
-                  <span>Comenzar Registro</span>
-                  <span className="group-hover:translate-x-1 transition-transform">‚Üí</span>
-                </div>
-              </button>
-
-              {/* Tarjeta de Invitaci√≥n a Cliente */}
-              <button
-                onClick={() => setInvMenuMode('cliente')}
-                className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl text-left hover:border-teal-550 dark:hover:border-teal-500 hover:shadow-xl hover:shadow-teal-500/5 transition-all hover:-translate-y-1 duration-300"
-              >
-                <div className="h-12 w-12 bg-teal-50 dark:bg-teal-950/40 rounded-2xl flex items-center justify-center text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform mb-5">
-                  <Tv size={24} />
-                </div>
-                <h3 className="text-base font-extrabold text-slate-900 dark:text-white mb-2">
-                  Invitar a ser Cliente XTV
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
-                  Genera credenciales de acceso de prueba o planes oficiales para clientes finales de entretenimiento. Genera invitaciones autom√°ticas con descarga de APK directa.
-                </p>
-                <div className="mt-5 inline-flex items-center gap-1 text-[11px] font-extrabold text-teal-600 dark:text-teal-400">
-                  <span>Generar Enlace Demo</span>
-                  <span className="group-hover:translate-x-1 transition-transform">‚Üí</span>
-                </div>
-              </button>
-            </div>
-          ) : invMenuMode === 'vendedor' ? (
-            /* ================= FORMULARIO INVITAR VENDEDOR ================= */
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 max-w-2xl mx-auto shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-150 dark:border-slate-800 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 bg-indigo-50 dark:bg-indigo-950/40 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                    <UserCheck size={18} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                      Registro de Vendedor Invitado
-                    </h3>
-                    <p className="text-[10px] text-slate-400 uppercase font-black">
-                      Nueva cuenta en tu red de afiliados
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setInvMenuMode(null);
-                    setInvVendNombre("");
-                    setInvVendTelefono("");
-                    setInvVendDireccion("");
-                    setInvVendUserId("");
-                    setInvVendCreated(null);
-                  }}
-                  className="text-xs font-bold text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg"
-                >
-                  Regresar
-                </button>
-              </div>
-
-              {invVendCreated ? (
-                /* √âXITO REGISTRO VENDEDOR */
-                <div className="space-y-6 text-center py-4 animate-scale-up">
-                  <div className="h-14 w-14 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-2 border border-emerald-500/20">
-                    <Check size={28} />
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-base font-extrabold text-slate-900 dark:text-white">
-                      ¬°Vendedor Reclutado Exitosamente!
-                    </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed font-semibold">
-                      La cuenta se ha creado de manera fidedigna en Supabase. El vendedor ya puede iniciar sesi√≥n en la plataforma con sus credenciales.
-                    </p>
-                  </div>
-
-                  <div className="bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 p-5 rounded-2xl max-w-md mx-auto text-left space-y-3">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block border-b border-slate-100 dark:border-slate-900 pb-1.5">
-                      Ficha de Acceso Vendedor
-                    </span>
-                    <div className="grid grid-cols-3 gap-2 text-xs font-semibold">
-                      <span className="text-slate-450 uppercase text-[10px]">Nombre:</span>
-                      <span className="col-span-2 text-slate-800 dark:text-slate-200">{invVendCreated.nombre}</span>
-
-                      <span className="text-slate-450 uppercase text-[10px]">Email Acceso:</span>
-                      <span className="col-span-2 text-indigo-500 dark:text-indigo-400 font-mono">{invVendCreated.email}</span>
-
-                      <span className="text-slate-450 uppercase text-[10px]">Clave Temporal:</span>
-                      <span className="col-span-2 text-slate-800 dark:text-slate-200 font-mono">123456</span>
-
-                      <span className="text-slate-450 uppercase text-[10px]">Tel√©fono:</span>
-                      <span className="col-span-2 text-slate-800 dark:text-slate-200">{invVendCreated.telefono_principal || "No especificado"}</span>
-
-                      <span className="text-slate-450 uppercase text-[10px]">Direcci√≥n:</span>
-                      <span className="col-span-2 text-slate-800 dark:text-slate-200">{invVendCreated.direccion_escrita || "No especificado"}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
-                    <button
-                      onClick={() => {
-                        const wspMsg = `*¬°Hola ${invVendCreated.nombre}!* üöÄ\nTe invito a formar parte de nuestra red de vendedores de *XTV*.\n\n*Tus datos de acceso:*\nüåê *Plataforma:* ${window.location.origin}\nüìß *Usuario:* ${invVendCreated.email}\nüîë *Clave:* 123456\n\n_¬°Ya puedes iniciar sesi√≥n, cargar cr√©ditos y gestionar tus propios clientes!_`;
-                        window.open(`https://api.whatsapp.com/send?phone=${invVendCreated.telefono_principal.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(wspMsg)}`, '_blank');
-                      }}
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-500/10"
-                    >
-                      <MessageSquare size={14} />
-                      <span>Compartir por WhatsApp</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setInvVendNombre("");
-                        setInvVendTelefono("");
-                        setInvVendDireccion("");
-                        setInvVendUserId("");
-                        setInvVendCreated(null);
-                      }}
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition-all"
-                    >
-                      Registrar Otro Vendedor
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* FORMULARIO EDITABLE DE VENDEDOR */
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!invVendNombre.trim() || !invVendUserId.trim() || !invVendTelefono.trim()) {
-                      toast.error("El nombre completo, ID de usuario y tel√©fono son campos obligatorios.");
-                      return;
-                    }
-                    if (invVendUserIdStatus !== 'available') {
-                      toast.error("Por favor, selecciona o ingresa un ID de usuario que se encuentre disponible.");
-                      return;
-                    }
-
-                    setInvVendSubmitting(true);
-                    const cleanId = invVendUserId.trim().toLowerCase();
-                    const invitedEmail = cleanId.includes('@') ? cleanId : `${cleanId}@xtv.com`;
-                    const inviterEmail = user?.email || userProfile?.email || "admin@xtv.com";
-
-                    // Reclutar usando el m√©todo nativo robusto enriquecido
-                    const randomUUID = typeof crypto.randomUUID === 'function' 
-                      ? crypto.randomUUID() 
-                      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                          var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-                          return v.toString(16);
-                        });
-
-                    const profilePayload = {
-                      id: randomUUID,
-                      email: invitedEmail,
-                      nombre: invVendNombre.trim(),
-                      rol: "IPTV VENDEDORES",
-                      password_hash: "123456",
-                      avatar_url: "",
-                      foto_perfil: "",
-                      creditos: 10,
-                      creditos_demo: 15,
-                      iptv_invitado_por: inviterEmail,
-                      iptv_ventas_directas_cant: 0,
-                      iptv_ventas_red_cant: 0,
-                      iptv_comisiones_cobradas_total: 0,
-                      telefono_principal: invVendTelefono.trim(),
-                      direccion_escrita: invVendDireccion.trim(),
-                      fecha_inicio: new Date().toISOString()
-                    };
-
-                    try {
-                      // Insertamos en perfiles_locales
-                      const { error: profileError } = await supabase.from("perfiles_locales").insert([profilePayload]);
-                      if (profileError) throw profileError;
-
-                      // Insertamos la relaci√≥n de √°rbol
-                      const newRelation = {
-                        id: Math.random().toString(36).substring(2, 11),
-                        inviter_email: inviterEmail,
-                        invited_email: invitedEmail,
-                        creado_al: new Date().toISOString()
-                      };
-
-                      try {
-                        await supabase.from("iptv_vendedores_relacion").insert([newRelation]);
-                      } catch (relErr) {
-                        console.warn("Relaci√≥n no insertada, guardando fallback:", relErr);
-                      }
-
-                      // Sincronizar estados locales de Dashboard
-                      const updatedRels = [...vendedoresRelaciones, newRelation];
-                      setVendedoresRelaciones(updatedRels);
-                      localStorage.setItem("g3d_vendedores_relacion", JSON.stringify(updatedRels));
-                      setPanelUsers(prev => [...prev.filter(u => u.usuario !== invitedEmail), {
-                        ...profilePayload,
-                        usuario: invitedEmail
-                      }]);
-
-                      setInvVendCreated(profilePayload);
-                      toast.success(`Vendedor "${invVendNombre}" registrado de forma fidedigna.`);
-                    } catch (err: any) {
-                      console.error(err);
-                      toast.error(`Error al registrar vendedor: ${err.message || err}`);
-                    } finally {
-                      setInvVendSubmitting(false);
-                    }
-                  }}
-                  className="space-y-4 text-left"
-                >
-                  {/* UUID Oculto y Nombre de quien invita */}
-                  <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 rounded-2xl flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                        Patrocinador / Quien Invita
-                      </span>
-                      <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">
-                        {userProfile?.nombre || user?.email || "Administrador Central"}
-                      </span>
-                    </div>
-                    {/* El UUID se conserva de forma oculta en el input de abajo de forma fidedigna */}
-                    <input
-                      type="hidden"
-                      value={userProfile?.id || user?.id || ""}
-                      readOnly
-                    />
-                    <div className="text-right">
-                      <span className="text-[9px] font-black bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-900 uppercase">
-                        V√≠nculo Activo
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Nombre Completo */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                        Nombre Completo *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Ej. Pedro Picapiedra"
-                        value={invVendNombre}
-                        onChange={(e) => setInvVendNombre(e.target.value)}
-                        className="w-full p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-100 font-semibold"
-                      />
-                    </div>
-
-                    {/* Tel√©fono */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                        Tel√©fono M√≥vil *
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        placeholder="Ej. +549112345678"
-                        value={invVendTelefono}
-                        onChange={(e) => setInvVendTelefono(e.target.value)}
-                        className="w-full p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-100 font-semibold"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Direcci√≥n Actual */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                      Direcci√≥n Actual
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ej. Av. Siempreviva 742, Springfield"
-                      value={invVendDireccion}
-                      onChange={(e) => setInvVendDireccion(e.target.value)}
-                      className="w-full p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-100 font-semibold"
-                    />
-                  </div>
-
-                  {/* ID de Usuario Invitado con Verificaci√≥n */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider block">
-                      ID de Usuario Invitado *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        required
-                        placeholder="Ej. vendedorjuan"
-                        value={invVendUserId}
-                        onChange={(e) => setInvVendUserId(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-                        className="w-full p-3.5 pr-10 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-100 font-mono font-semibold"
-                      />
-                      {/* Icono de verificaci√≥n interactiva */}
-                      <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
-                        {invVendUserIdChecking ? (
-                          <div className="h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                        ) : invVendUserIdStatus === 'available' ? (
-                          <div className="h-4 w-4 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold animate-bounce">
-                            ‚úì
-                          </div>
-                        ) : invVendUserIdStatus === 'taken' ? (
-                          <div className="h-4 w-4 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold">
-                            √ó
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {/* Estados de validaci√≥n y sugerencias */}
-                    {invVendUserIdStatus === 'available' && (
-                      <p className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
-                        <span>‚úì ID de usuario disponible:</span>
-                        <span className="font-mono">{invVendUserId.trim().toLowerCase()}@xtv.com</span>
-                      </p>
-                    )}
-
-                    {invVendUserIdStatus === 'taken' && (
-                      <div className="bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 p-3 rounded-xl space-y-2">
-                        <p className="text-[10px] font-bold text-red-600">
-                          ‚úó El ID de usuario ya se encuentra registrado. Por favor selecciona una de las siguientes opciones sugeridas libres:
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {invVendUserIdSuggestions.map((sug) => (
-                            <button
-                              key={sug}
-                              type="button"
-                              onClick={() => {
-                                setInvVendUserId(sug);
-                                setInvVendUserIdStatus('available');
-                                setInvVendUserIdSuggestions([]);
-                              }}
-                              className="px-2.5 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/40 dark:hover:bg-red-800/60 text-red-700 dark:text-red-300 text-[10px] font-mono font-black rounded-lg transition-all"
-                            >
-                              {sug}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={invVendSubmitting || invVendUserIdStatus !== 'available'}
-                    className="w-full inline-flex items-center justify-center gap-2 py-3.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-150 dark:disabled:bg-slate-800 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-xs font-black rounded-xl transition-all shadow-md shadow-indigo-500/10"
-                  >
-                    {invVendSubmitting ? (
-                      <>
-                        <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Procesando Registro...</span>
-                      </>
-                    ) : (
-                      <span>Completar e Invitar Vendedor</span>
-                    )}
-                  </button>
-                </form>
-              )}
-            </div>
-          ) : (
-            /* ================= FORMULARIO INVITAR CLIENTE XTV ================= */
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 max-w-2xl mx-auto shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-150 dark:border-slate-800 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 bg-teal-50 dark:bg-teal-950/40 rounded-xl flex items-center justify-center text-teal-600 dark:text-teal-400">
-                    <Tv size={18} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                      Invitaci√≥n de Cliente XTV
-                    </h3>
-                    <p className="text-[10px] text-slate-400 uppercase font-black">
-                      Generar credencial y demo en un clic
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setInvMenuMode(null);
-                    setInvCliNombre("");
-                    setInvCliTelefono("");
-                    setInvCliCreated(null);
-                  }}
-                  className="text-xs font-bold text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg"
-                >
-                  Regresar
-                </button>
-              </div>
-
-              {invCliCreated ? (
-                /* INVITACI√ìN DE CLIENTE GENERADA */
-                <div className="space-y-6 animate-scale-up">
-                  <div className="text-center space-y-1.5">
-                    <div className="h-12 w-12 bg-teal-500/10 text-teal-500 rounded-full flex items-center justify-center mx-auto mb-2 border border-teal-500/20">
-                      <Check size={24} />
-                    </div>
-                    <h4 className="text-base font-extrabold text-slate-900 dark:text-white">
-                      ¬°Invitaci√≥n de Cliente Generada!
-                    </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed font-semibold">
-                      La cuenta IPTV ha quedado activa en el panel con el plan de demo seleccionado. Comparte la tarjeta de descarga con el cliente.
-                    </p>
-                  </div>
-
-                  <div className="bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 p-5 rounded-2xl text-left space-y-3 relative group">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block border-b border-slate-100 dark:border-slate-900 pb-1.5">
-                      Mensaje de Invitaci√≥n (WhatsApp Ready)
-                    </span>
-                    <pre className="font-mono text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed select-all max-h-[160px] overflow-y-auto">
-                      {`*¬°Hola ${invCliCreated.nombre}!* üé¨‚ú®\nTu acceso a *XTV Premium* est√° listo.\n\n*Tus credenciales de acceso:*\nüåê *Servidor:* http://xtvdigital.net:8080\nüë§ *Usuario:* ${invCliCreated.usuario}\nüîë *Contrase√±a:* ${invCliCreated.password}\nüì± *L√≠mite:* 2 pantallas simult√°neas\n‚è≥ *Duraci√≥n:* Plan Demo 2 Horas\n\n‚¨áÔ∏è *Descarga la App de XTV directo desde aqu√≠:* \nhttps://xtv.net/download.apk`}
-                    </pre>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
-                    <button
-                      onClick={() => {
-                        const message = `*¬°Hola ${invCliCreated.nombre}!* üé¨‚ú®\nTu acceso a *XTV Premium* est√° listo.\n\n*Tus credenciales de acceso:*\nüåê *Servidor:* http://xtvdigital.net:8080\nüë§ *Usuario:* ${invCliCreated.usuario}\nüîë *Contrase√±a:* ${invCliCreated.password}\nüì± *L√≠mite:* 2 pantallas simult√°neas\n‚è≥ *Duraci√≥n:* Plan Demo 2 Horas\n\n‚¨áÔ∏è *Descarga la App de XTV directo desde aqu√≠:* \nhttps://xtv.net/download.apk`;
-                        navigator.clipboard.writeText(message);
-                        toast.success("¬°Texto de invitaci√≥n copiado al portapapeles!");
-                      }}
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-indigo-500/10"
-                    >
-                      <FileText size={14} />
-                      <span>Copiar Texto Invitaci√≥n</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        const message = `*¬°Hola ${invCliCreated.nombre}!* üé¨‚ú®\nTu acceso a *XTV Premium* est√° listo.\n\n*Tus credenciales de acceso:*\nüåê *Servidor:* http://xtvdigital.net:8080\nüë§ *Usuario:* ${invCliCreated.usuario}\nüîë *Contrase√±a:* ${invCliCreated.password}\nüì± *L√≠mite:* 2 pantallas simult√°neas\n‚è≥ *Duraci√≥n:* Plan Demo 2 Horas\n\n‚¨áÔ∏è *Descarga la App de XTV directo desde aqu√≠:* \nhttps://xtv.net/download.apk`;
-                        window.open(`https://api.whatsapp.com/send?phone=${invCliCreated.celular.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(message)}`, '_blank');
-                      }}
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-emerald-500/10"
-                    >
-                      <MessageSquare size={14} />
-                      <span>Enviar por WhatsApp</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setInvCliNombre("");
-                        setInvCliTelefono("");
-                        setInvCliCreated(null);
-                      }}
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl transition-all"
-                    >
-                      Generar Otra Demo
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* FORMULARIO EDITABLE DE CLIENTE */
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (!invCliNombre.trim() || !invCliTelefono.trim()) {
-                      toast.error("El nombre completo y el tel√©fono son campos obligatorios.");
-                      return;
-                    }
-
-                    setInvCliLoading(true);
-                    toast.loading("Generando cuenta demo en API XTV...");
-
-                    // Generar credenciales aleatorias
-                    const randUser = "xtv_" + Math.random().toString(36).substring(2, 9);
-                    const randPass = Math.floor(100000 + Math.random() * 900000).toString();
-
-                    try {
-                      const expirationDate = new Date();
-                      expirationDate.setHours(expirationDate.getHours() + 2);
-
-                      const mockClient = {
-                        id: Math.random().toString(36).substring(2, 11),
-                        nombre_completo: invCliNombre.trim(),
-                        celular: invCliTelefono.trim(),
-                        usuario: randUser,
-                        password: randPass,
-                        limite_pantallas: 2,
-                        id_plan_venta: "plan_demo_2h",
-                        creado_al: new Date().toISOString(),
-                        expiracion_al: expirationDate.toISOString(),
-                        estado_activo: true,
-                        vendedor: user?.email || "vendedor@xtv.com"
-                      };
-
-                      // Registrar cliente en BD
-                      const { error } = await supabase.from("iptv_clientes").insert([mockClient]);
-                      if (error) throw error;
-
-                      // Sincronizar en local
-                      const updatedClients = [...accounts, mockClient];
-                      setAccounts(updatedClients);
-                      localStorage.setItem("g3d_iptv_clientes", JSON.stringify(updatedClients));
-
-                      setInvCliCreated(mockClient);
-                      toast.dismiss();
-                      toast.success(`Demo generada correctamente para ${invCliNombre}`);
-                    } catch (err: any) {
-                      toast.dismiss();
-                      console.error(err);
-                      toast.error(`Error al generar demo IPTV: ${err.message || err}`);
-                    } finally {
-                      setInvCliLoading(false);
-                    }
-                  }}
-                  className="space-y-4 text-left"
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Nombre del Cliente */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                        Nombre Completo *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Ej. Pedro Picapiedra"
-                        value={invCliNombre}
-                        onChange={(e) => setInvCliNombre(e.target.value)}
-                        className="w-full p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-teal-500 text-slate-800 dark:text-slate-100 font-semibold"
-                      />
-                    </div>
-
-                    {/* Tel√©fono del Cliente */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                        Tel√©fono M√≥vil *
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        placeholder="Ej. +549112345678"
-                        value={invCliTelefono}
-                        onChange={(e) => setInvCliTelefono(e.target.value)}
-                        className="w-full p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-teal-500 text-slate-800 dark:text-slate-100 font-semibold"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Plan / Tipo de Demo */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
-                      Plan de Duraci√≥n de Demo *
-                    </label>
-                    <select
-                      value={invCliPlan}
-                      onChange={(e) => setInvCliPlan(e.target.value)}
-                      className="w-full p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-250 dark:border-slate-800 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-teal-500 text-slate-800 dark:text-slate-100 font-semibold appearance-none"
-                    >
-                      <option value="demo_2h">Prueba Demo Gratis - 2 Horas (2 Pantallas Simult√°neas)</option>
-                      <option value="demo_24h" disabled>Prueba Premium - 24 Horas (Inhabilitado temporalmente)</option>
-                    </select>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={invCliLoading}
-                    className="w-full inline-flex items-center justify-center gap-2 py-3.5 bg-teal-600 hover:bg-teal-500 disabled:bg-slate-150 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-teal-500/10"
-                  >
-                    {invCliLoading ? (
-                      <>
-                        <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Generando Demo...</span>
-                      </>
-                    ) : (
-                      <span>Generar Invitaci√≥n con Demo Gratis</span>
-                    )}
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* MODAL IMPRESIVA DE PREVIEW DE COMPROBANTE DE PAGO CON ZOOM INTELIGENTE Y DESCARGA NATIVA PNG */}
-      {viewingComprobante && (
-        <div
-          className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 cursor-default animate-fade-in"
-          onClick={() => {
-            setViewingComprobante(null);
-            setZoomActive(false);
-          }}
-        >
-          <div
-            className="bg-slate-905 dark:bg-slate-950 border border-slate-800 p-4 sm:p-5 rounded-3xl max-w-xl w-full relative overflow-hidden shadow-2xl flex flex-col max-h-[92vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Cabecera del visualizador */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
-              <div className="space-y-0.5">
-                <h4 className="font-extrabold text-xs uppercase tracking-wider text-cyan-400 flex items-center gap-2">
-                  <span className="flex h-1.5 w-1.5 rounded-full bg-cyan-450 animate-ping"></span>
-                  Visualizador Inteligente
-                </h4>
-                <p className="text-[10px] text-slate-450 uppercase font-bold">
-                  Auditor√≠a Avanzada de Voucher
-                </p>
-              </div>
-              <button
-                className="text-slate-400 hover:text-white font-black text-sm px-3 py-1.5 hover:bg-slate-900 rounded-xl transition-all border border-slate-800"
-                onClick={() => {
-                  setViewingComprobante(null);
-                  setZoomActive(false);
-                }}
-              >
-                Cerrar √ó
-              </button>
-            </div>
-
-            {/* Barra de herramientas / Botones de acci√≥n directos */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-2.5 rounded-2xl border border-slate-850 mb-4">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setZoomActive(!zoomActive);
-                    toast.info(
-                      !zoomActive
-                        ? "üîç Zoom Inteligente activado. Usa el puntero en PC o el tacto en m√≥vil."
-                        : "Vista est√°ndar completa restaurada.",
-                    );
-                  }}
-                  className={`px-3 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition-all ${
-                    zoomActive
-                      ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/10"
-                      : "bg-slate-850 hover:bg-slate-800 text-white border border-slate-750"
-                  }`}
-                >
-                  <span className="text-xs">üîç</span>
-                  {zoomActive ? "Desactivar Zoom" : "Activar Zoom"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const loadingToast = toast.loading(
-                      "Generando y preparando PNG nativo...",
-                    );
-                    try {
-                      const img = new Image();
-                      img.crossOrigin = "anonymous";
-                      img.onload = () => {
-                        const canvas = document.createElement("canvas");
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext("2d");
-                        if (ctx) {
-                          ctx.drawImage(img, 0, 0);
-                          // Forzar conversi√≥n y descarga en formato PNG nativo aut√©ntico
-                          const pngUrl = canvas.toDataURL("image/png");
-                          const link = document.createElement("a");
-                          link.download = `comprobante_inspeccionado_${Date.now()}.png`;
-                          link.href = pngUrl;
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                          toast.dismiss(loadingToast);
-                          toast.success(
-                            "üì• ¬°Comprobante PNG descargado con √©xito!",
-                          );
-                        } else {
-                          toast.dismiss(loadingToast);
-                          toast.error(
-                            "No se pudo iniciar el canvas de conversi√≥n.",
-                          );
-                        }
-                      };
-                      img.onerror = () => {
-                        toast.dismiss(loadingToast);
-                        // Descarga de respaldo si falla canvas
-                        const link = document.createElement("a");
-                        link.download = `comprobante_respaldo_${Date.now()}.png`;
-                        link.href = viewingComprobante;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        toast.success("Descargado enlace del comprobante.");
-                      };
-                      img.src = viewingComprobante;
-                    } catch (err) {
-                      toast.dismiss(loadingToast);
-                      toast.error("Error al procesar la descarga.");
-                    }
-                  }}
-                  className="px-3 py-2 rounded-xl text-xs font-black uppercase bg-slate-850 hover:bg-slate-800 text-white border border-slate-750 flex items-center gap-1.5 transition-all"
-                >
-                  <span>üì•</span> Descargar PNG
-                </button>
-              </div>
-
-              <div className="text-[10px] uppercase font-black text-slate-450 tracking-wider">
-                {zoomActive ? "üîç Inspect Active" : "üëÅÔ∏è Standard View"}
-              </div>
-            </div>
-
-            {/* Contenido principal del visualizador */}
-            <div className="flex-1 overflow-y-auto pr-0.5 space-y-3 min-h-[40vh]">
-              {!zoomActive ? (
-                /* 1. VISTA EST√ÅNDAR COMPLETA (Sin Zoom) */
-                <div className="space-y-2.5">
-                  <div className="bg-slate-950 p-2 rounded-2xl border border-slate-850 flex items-center justify-center relative group overflow-hidden">
-                    <img
-                      src={viewingComprobante}
-                      className="max-h-[55vh] w-auto object-contain rounded-xl select-none"
-                      alt="Voucher de pago est√°ndar"
-                    />
-                  </div>
-                  <div className="text-center p-3 bg-slate-900/40 rounded-2xl border border-slate-850/60">
-                    <p className="text-[11px] font-bold text-slate-400">
-                      üí° ¬øQuieres auditar firmas, importes o fechas borrosas?
-                      Presiona el bot√≥n{" "}
-                      <span className="text-cyan-400">üîç Activar Zoom</span>{" "}
-                      arriba.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                /* 2. VISTA DE ZOOM INTELIGENTE (Inspector Activo) */
-                <div className="space-y-4">
-                  {/* COMPORTAMIENTO CELULAR / RESPONSIVE M√ìVIL (T√°ctil con Split Screen) */}
-                  <div className="block md:hidden space-y-3">
-                    <div className="bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-2xl text-[10px] font-bold text-amber-300 text-center uppercase tracking-wide">
-                      üì± Modo M√≥vil: Desliza el dedo abajo para ver la lupa
-                      arriba
-                    </div>
-
-                    <div className="grid grid-rows-2 gap-3 h-[60vh]">
-                      {/* Visor superior (Lente de aumento 50% de zoom - escala ampliada sin tapar con el dedo) */}
-                      <div className="bg-slate-950 rounded-2xl border-2 border-cyan-500 relative overflow-hidden shadow-inner flex items-center justify-center">
-                        <div className="absolute inset-0 z-10 pointers-events-none flex items-center justify-center">
-                          {/* Ret√≠cula de mira telesc√≥pica en el centro exacto */}
-                          <div className="absolute w-8 h-8 rounded-full border border-rose-500/40 flex items-center justify-center">
-                            <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div>
-                          </div>
-                          <div className="absolute w-12 h-[1px] bg-rose-500/30"></div>
-                          <div className="absolute h-12 w-[1px] bg-rose-500/30"></div>
-                          <span className="absolute bottom-1 right-2 bg-slate-900/80 px-2 py-0.5 rounded-md text-[9px] font-black text-cyan-400 border border-slate-800 uppercase">
-                            Visor Lupa
-                          </span>
-                        </div>
-
-                        {/* Duplicado de la imagen escalada en base a la coordenada de touchPosition */}
-                        <img
-                          src={viewingComprobante}
-                          className="absolute w-full h-full object-contain pointer-events-none"
-                          style={{
-                            transform: "scale(2.2)",
-                            transformOrigin: `${touchPosition.x}% ${touchPosition.y}%`,
-                            transition: "transform-origin 0.05s ease-out",
-                          }}
-                          alt="Detalle ampliado de la captura"
-                        />
-                      </div>
-
-                      {/* Mapa de toque inferior (Imagen completa t√°ctil) */}
-                      <div
-                        className="bg-slate-950 rounded-2xl border border-slate-800 relative overflow-hidden flex items-center justify-center cursor-crosshair select-none"
-                        onTouchStart={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          const touch = e.touches[0];
-                          const x =
-                            ((touch.clientX - rect.left) / rect.width) * 100;
-                          const y =
-                            ((touch.clientY - rect.top) / rect.height) * 100;
-                          setTouchPosition({
-                            x: Math.max(0, Math.min(100, x)),
-                            y: Math.max(0, Math.min(100, y)),
-                          });
-                        }}
-                        onTouchMove={(e) => {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          const touch = e.touches[0];
-                          const x =
-                            ((touch.clientX - rect.left) / rect.width) * 100;
-                          const y =
-                            ((touch.clientY - rect.top) / rect.height) * 100;
-                          setTouchPosition({
-                            x: Math.max(0, Math.min(100, x)),
-                            y: Math.max(0, Math.min(100, y)),
-                          });
-                        }}
-                      >
-                        <img
-                          src={viewingComprobante}
-                          className="w-full h-full object-contain pointer-events-none opacity-40 select-none pb-2"
-                          alt="Voucher mapa de toque"
-                        />
-
-                        {/* Indicador visible flotante de la mira en la imagen inferior */}
-                        <div
-                          className="absolute w-6 h-6 rounded-full border-2 border-cyan-455 bg-cyan-400/20 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none"
-                          style={{
-                            left: `${touchPosition.x}%`,
-                            top: `${touchPosition.y}%`,
-                          }}
-                        >
-                          <div className="w-1.5 h-1.5 rounded-full bg-cyan-450"></div>
-                        </div>
-
-                        <span className="absolute bottom-2 left-2 bg-slate-900/80 px-2 py-0.5 rounded text-[8px] font-black uppercase text-slate-400 border border-slate-800">
-                          Panel T√°ctil de Selecci√≥n (Toca aqu√≠)
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* COMPORTAMIENTO MOUSE / PC ESCRITORIO (Lupa interactiva de una sola imagen al mover mouse) */}
-                  <div className="hidden md:block space-y-2">
-                    <div className="bg-cyan-500/10 border border-cyan-500/20 px-3 py-1.5 rounded-2xl text-[10px] font-bold text-cyan-300 text-center uppercase tracking-wide">
-                      üñ•Ô∏è Modo PC: Pasa y mueve el cursor sobre la imagen para
-                      aplicar Zoom exacto
-                    </div>
-
-                    <div
-                      className="bg-slate-950 rounded-2xl border border-slate-850 overflow-hidden relative flex items-center justify-center cursor-crosshair select-none h-[52vh]"
-                      onMouseMove={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const x = ((e.clientX - rect.left) / rect.width) * 100;
-                        const y = ((e.clientY - rect.top) / rect.height) * 100;
-                        setMousePosition({ x, y });
-                      }}
-                    >
-                      <img
-                        src={viewingComprobante}
-                        className="w-full h-full object-contain select-none transition-transform duration-75 ease-out"
-                        style={{
-                          transform: "scale(2.3)",
-                          transformOrigin: `${mousePosition.x}% ${mousePosition.y}%`,
-                        }}
-                        alt="Detalle lupa escritorio"
-                      />
-
-                      <div className="absolute bottom-2.5 right-3 bg-black/75 px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider text-cyan-400 border border-slate-800 pointer-events-none">
-                        Zoom: 2.3x (Inspeccionando)
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Pie de modal */}
-            <div className="border-t border-slate-800 pt-3 mt-3 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase">
-              <span>Socio Split: Vigilancia</span>
-              <span>XTV Auditor v3.1</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODAL MODERNA DE ZOOM GENERAL PARA COMPROBANTES DE CONFIGURACI√ìN Y ACTIVACIONES --- */}
-      {zoomImageUrl && (
-        <div className="fixed inset-0 z-[999] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-8 animate-fade-in">
-          {/* Cabecera flotante */}
-          <div className="w-full max-w-4xl flex items-center justify-between mb-4 text-white z-10">
-            <div className="flex items-center gap-2">
-              <div className="size-8 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400">
-                <Maximize2 size={16} />
-              </div>
-              <div>
-                <p className="text-xs font-black uppercase tracking-widest text-cyan-400">
-                  Visor de Comprobantes
-                </p>
-                <p className="text-[10px] text-slate-400">
-                  Usa los controles de abajo o pellizca para aplicar zoom
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                setZoomScale(1);
-                setZoomImageUrl(null);
-              }}
-              className="size-10 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer min-h-[44px]"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          {/* √Årea de la imagen con escala din√°mica */}
-          <div className="flex-1 w-full max-w-4xl flex items-center justify-center overflow-auto rounded-3xl border border-white/10 bg-slate-900/50 p-4 relative select-none">
-            <div
-              className="transition-transform duration-150 ease-out flex items-center justify-center"
-              style={{
-                transform: `scale(${zoomScale})`,
-              }}
-            >
-              <img
-                src={zoomImageUrl}
-                alt="Zoomed Comprobante"
-                className="max-h-[70vh] max-w-full object-contain rounded-xl shadow-2xl pointer-events-none select-none"
-              />
-            </div>
-          </div>
-
-          {/* Barra de controles inferior */}
-          <div className="mt-4 bg-slate-900/80 border border-slate-800 backdrop-blur px-6 py-3 rounded-2xl flex items-center gap-4 z-10">
-            <button
-              onClick={() => setZoomScale((prev) => Math.max(1, prev - 0.5))}
-              disabled={zoomScale <= 1}
-              className="size-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-all min-h-[44px]"
-              title="Reducir Zoom"
-            >
-              <ZoomOut size={16} />
-            </button>
-
-            <span className="font-mono text-xs font-bold text-slate-300 w-12 text-center">
-              {zoomScale.toFixed(1)}x
-            </span>
-
-            <button
-              onClick={() => setZoomScale((prev) => Math.min(5, prev + 0.5))}
-              disabled={zoomScale >= 5}
-              className="size-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-white disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-all min-h-[44px]"
-              title="Aumentar Zoom"
-            >
-              <ZoomIn size={16} />
-            </button>
-
-            <div className="w-px h-6 bg-slate-850"></div>
-
-            <button
-              onClick={() => setZoomScale(1)}
-              disabled={zoomScale === 1}
-              className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold uppercase transition-all min-h-[44px]"
-            >
-              Resetear
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DE NOTA DE RECHAZO DE TICKET */}
-      {rejectionModalOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/85 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative">
-            <div>
-              <h3 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                ‚ö†Ô∏è Especificar Motivo de Rechazo
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Indica el motivo del rechazo. Esto le permitir√° al socio
-                corregir el error y reenviar la solicitud corregida de
-                inmediato.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[11px] font-black uppercase text-slate-500 block">
-                Motivo o Notas de Correcci√≥n
-              </label>
-              <textarea
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Ej: El comprobante adjunto pertenece a otro pago o los datos de usuario propuesto ya est√°n en uso."
-                className="w-full h-32 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs focus:ring-2 focus:ring-cyan-500 outline-none resize-none transition-all"
-              />
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setRejectionModalOpen(false);
-                  setRejectionRequestId(null);
-                  setRejectionReason("");
-                }}
-                className="flex-1 py-3 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold rounded-2xl text-xs transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!rejectionReason.trim()) {
-                    toast.error("Por favor, especifica un motivo de rechazo.");
-                    return;
-                  }
-                  if (rejectionRequestId) {
-                    const req = creditRequests.find(
-                      (r) => r.id === rejectionRequestId,
-                    );
-                    handleProcessRequest(
-                      rejectionRequestId,
-                      "rechazado",
-                      req?.detalles,
-                      rejectionReason.trim(),
-                    );
-                  }
-                  setRejectionModalOpen(false);
-                  setRejectionRequestId(null);
-                  setRejectionReason("");
-                }}
-                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-2xl text-xs transition-colors shadow-lg shadow-red-500/10"
-              >
-                Confirmar Rechazo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DE CONFIRMACI√ìN DE ELIMINACI√ìN DE CLIENTE */}
-      {deleteConfirmUsernames && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/85 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative text-left">
-            <div>
-              <div className="size-12 rounded-2xl bg-rose-100 dark:bg-rose-950/40 text-rose-600 flex items-center justify-center mb-4">
-                <Trash2 size={24} />
-              </div>
-              <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
-                ‚ö†Ô∏è ¬øConfirmar Eliminaci√≥n Irreversible?
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Est√°s a punto de eliminar de forma permanente{" "}
-                {deleteConfirmUsernames.length === 1
-                  ? "este cliente"
-                  : `estos ${deleteConfirmUsernames.length} clientes`}
-                . Esta acci√≥n no se puede deshacer y purgar√° todos los
-                subperfiles, historiales de renovaci√≥n y comprobantes asociados
-                de la base de datos de producci√≥n.
-              </p>
-            </div>
-
-            <div className="bg-rose-50/40 dark:bg-rose-950/10 border border-rose-200/45 dark:border-rose-900/30 rounded-2xl p-4 space-y-2">
-              <span className="text-[10px] uppercase font-black text-rose-600 block">
-                Cuentas que se purgar√°n:
-              </span>
-              <div className="max-h-24 overflow-y-auto text-xs font-mono font-bold text-slate-700 dark:text-slate-300 space-y-1">
-                {deleteConfirmUsernames.map((u, i) => (
-                  <div key={u} className="flex items-center gap-1.5">
-                    <span className="text-rose-400">{i + 1}.</span>
-                    <span>{u}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setDeleteConfirmUsernames(null)}
-                className="flex-1 py-3 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold rounded-2xl text-xs transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => executeDeleteClients(deleteConfirmUsernames)}
-                className="flex-1 py-3 bg-rose-650 hover:bg-rose-700 text-white font-extrabold rounded-2xl text-xs transition-colors shadow-lg shadow-rose-500/10"
-              >
-                S√≠, Eliminar de ra√≠z
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DE ALTA EXITOSA CON MENSAJE RESPUESTA WHATSAPP */}
-      {approvedMessageModal && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/85 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative text-left">
-            <div>
-              <div className="size-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center mb-4">
-                <CheckCircle2 size={24} />
-              </div>
-              <h3 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                üöÄ ¬°Alta Activada con √âxito!
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                La cuenta de cliente IPTV se ha registrado en Supabase y se ha
-                enlazado con el panel f√≠sico de producci√≥n. Copia el siguiente
-                mensaje preformateado para responder al socio de inmediato.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-black uppercase text-slate-500 block">
-                  Mensaje de Respuesta Generado
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(approvedMessageModal);
-                    toast.success(
-                      "Mensaje copiado al portapapeles correctamente",
-                    );
-                  }}
-                  className="px-2.5 py-1 text-[10px] bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-600 rounded-lg hover:scale-105 transition-all font-bold flex items-center gap-1"
-                >
-                  <Copy size={11} />
-                  Copiar Mensaje
-                </button>
-              </div>
-
-              <div className="relative">
-                <textarea
-                  readOnly
-                  value={approvedMessageModal}
-                  className="w-full h-44 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs font-mono focus:outline-none resize-none transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setApprovedMessageModal(null);
-                }}
-                className="w-full py-3 bg-slate-900 hover:bg-slate-850 text-white font-extrabold rounded-2xl text-xs transition-colors shadow-lg"
-              >
-                Cerrar Ventana
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DE ADVERTENCIA CREACION CUENTA DIRECTA BLOQUEADA */}
-      {showDirectBlockModal && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/85 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative text-left">
-            <div className="text-center">
-              <div className="size-16 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-500 flex items-center justify-center mx-auto mb-4 border border-amber-200/50 dark:border-amber-800/30">
-                <Lock size={32} className="animate-pulse" />
-              </div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white">
-                Acceso Restringido
-              </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-200 mt-2 leading-relaxed">
-                No tienes el permiso{" "}
-                <span className="font-mono text-xs text-amber-600 dark:text-amber-400 bg-amber-100/30 dark:bg-amber-950/20 px-1.5 py-0.5 rounded-md">
-                  Iptv.CrearDirecto.Acceder
-                </span>{" "}
-                asignado.
-              </p>
-              <div className="mt-4 p-4 rounded-2xl bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200/30 text-slate-600 dark:text-slate-300 text-xs leading-normal">
-                üìç Puedes solicitar la creaci√≥n directa de cuentas a un{" "}
-                <strong>Administrador</strong> del sistema o adquirir un rol con
-                privilegios autorizados.
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDirectBlockModal(false);
-                }}
-                className="w-full py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-2xl text-xs transition-colors"
-              >
-                Cerrar Mensaje
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- CONSOLA DE COMANDOS Y LOGS DE LA API XC --- */}
-      {(hasPermission("Admin.*") ||
-        hasPermission("Iptv.*") ||
-        hasPermission("Admin.ConsolaAPI.Ver") ||
-        isAdmin) && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 mt-12 text-slate-100 font-sans shadow-2xl relative overflow-hidden">
-          {/* Fondo sutil estilo terminal */}
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-indigo-500"></div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-            <div className="flex items-center gap-2">
-              <div className="size-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                <Terminal size={16} />
-              </div>
-              <div>
-                <h3 className="text-sm font-black uppercase tracking-wider text-white">
-                  Consola de Comandos y Logs de la API XC
-                </h3>
-                <p className="text-[10px] text-slate-400">
-                  Inspecciona las peticiones enviadas al servidor f√≠sico y las
-                  respuestas recibidas en tiempo real
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 shrink-0">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={apiInterceptorActive}
-                  onChange={(e) => setApiInterceptorActive(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <span className="text-[10px] font-bold text-slate-400">
-                  Interceptor de API (Editar pre-env√≠o)
-                </span>
-                <div className="relative w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-cyan-500 peer-checked:after:bg-white"></div>
-              </label>
-
-              <button
-                onClick={() => {
-                  setApiLogs([]);
-                  try {
-                    localStorage.removeItem("g3d_xc_api_logs");
-                  } catch (e) {}
-                  toast.success("Historial de logs de API limpiado");
-                }}
-                className="px-3 py-1.5 rounded-xl border border-slate-800 hover:bg-slate-800 text-[10px] font-bold text-slate-400 transition-colors cursor-pointer"
-              >
-                Limpiar Historial
-              </button>
-            </div>
-          </div>
-
-          <div className="border border-slate-800 rounded-2xl bg-slate-950 overflow-hidden min-h-[180px] max-h-[400px] overflow-y-auto">
-            {apiLogs.length > 0 ? (
-              <div className="divide-y divide-slate-850">
-                {apiLogs.map((log) => {
-                  const isExpanded = !!expandedLogs[log.id];
-                  const logDetectedId = log.responsePayload?.raw_response?.data?.id || 
-                                        log.responsePayload?.data?.id || 
-                                        log.responsePayload?.id || 
-                                        log.requestPayload?.id;
-                  const logUser = log.responsePayload?.username || 
-                                  log.responsePayload?.data?.username || 
-                                  log.requestPayload?.username || 
-                                  "";
-                  const logNotes = log.requestPayload?.reseller_notes || "";
-
-                  return (
-                    <div key={log.id} className="text-xs font-mono">
-                      {/* Cabecera del Log */}
-                      <div
-                        onClick={() => toggleLogExpanded(log.id)}
-                        className="p-3 hover:bg-slate-900/50 flex items-center justify-between cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="text-[10px] text-slate-500 font-sans">
-                            {log.timestamp}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
-                              log.action === "create_line" &&
-                              log.requestPayload?.trial === 1
-                                ? "bg-cyan-950 text-cyan-400 border border-cyan-800/30"
-                                : log.action === "extend_line"
-                                ? "bg-emerald-950 text-emerald-400 border border-emerald-800/30"
-                                : "bg-indigo-950 text-indigo-400 border border-indigo-800/30"
-                            }`}
-                          >
-                            {log.action}
-                          </span>
-                          <span className="text-slate-300 font-bold max-w-[200px] sm:max-w-[340px] truncate">
-                            {logNotes ? logNotes : logUser ? `Usuario: ${logUser}` : "Petici√≥n a Servidor XC"}
-                            {logDetectedId ? ` (ID: #${logDetectedId})` : ""}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[9px] font-black uppercase flex items-center gap-1 ${
-                              log.success
-                                ? "bg-emerald-950/50 text-emerald-400 border border-emerald-800/30"
-                                : "bg-red-950/50 text-red-400 border border-red-800/30"
-                            }`}
-                          >
-                            {log.success ? "‚úì EXITO" : "‚úó ERROR"}
-                          </span>
-                          <span className="text-slate-500 text-[10px]">
-                            {isExpanded ? "‚ñ≤" : "‚ñº"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Detalles Expandidos */}
-                      {isExpanded && (
-                        <div className="p-4 bg-slate-950/80 border-t border-slate-850 space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Comando/Payload enviado */}
-                            <div className="space-y-1.5">
-                              <div className="flex items-center justify-between text-[10px] text-slate-400 font-sans uppercase font-black tracking-wider">
-                                <span>Payload de API Solicitado</span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigator.clipboard.writeText(
-                                      JSON.stringify(
-                                        log.requestPayload,
-                                        null,
-                                        2,
-                                      ),
-                                    );
-                                    toast.success("Payload copiado");
-                                  }}
-                                  className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
-                                >
-                                  <Copy size={11} /> Copiar
-                                </button>
-                              </div>
-                              <pre className="p-3 bg-slate-900 rounded-xl overflow-x-auto text-[10px] text-slate-300 max-h-[180px] border border-slate-800">
-                                {JSON.stringify(log.requestPayload, null, 2)}
-                              </pre>
-                            </div>
-
-                            {/* Respuesta del Servidor XC */}
-                            <div className="space-y-1.5">
-                              <div className="flex items-center justify-between text-[10px] text-slate-400 font-sans uppercase font-black tracking-wider">
-                                <span>Respuesta en Bruto del Servidor</span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigator.clipboard.writeText(
-                                      JSON.stringify(
-                                        log.responsePayload,
-                                        null,
-                                        2,
-                                      ),
-                                    );
-                                    toast.success("Respuesta copiada");
-                                  }}
-                                  className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
-                                >
-                                  <Copy size={11} /> Copiar
-                                </button>
-                              </div>
-                              <pre
-                                className={`p-3 rounded-xl overflow-x-auto text-[10px] max-h-[180px] border ${
-                                  log.success
-                                    ? "bg-slate-900 text-emerald-300 border-slate-800"
-                                    : "bg-red-950/20 text-red-300 border-red-900/30"
-                                }`}
-                              >
-                                {log.responsePayload
-                                  ? JSON.stringify(log.responsePayload, null, 2)
-                                  : "No se recibi√≥ respuesta o fallo de conexi√≥n"}
-                              </pre>
-                            </div>
-                          </div>
-
-                          {log.error && (
-                            <div className="p-3 bg-red-950/30 border border-red-900/40 rounded-xl text-[11px] text-red-300">
-                              <span className="font-sans font-black uppercase text-[9px] text-red-400 block mb-1">
-                                Detalle del Error T√©cnico:
-                              </span>
-                              {log.error}
-                            </div>
-                          )}
-
-                          {log.warnings && log.warnings.length > 0 && (
-                            <div className="p-3 bg-amber-950/30 border border-amber-900/40 rounded-xl text-[11px] text-amber-300 space-y-1">
-                              <span className="font-sans font-black uppercase text-[9px] text-amber-400 block">
-                                ‚ö†Ô∏è Advertencias de Revendedor / Panel:
-                              </span>
-                              <ul className="list-disc list-inside space-y-0.5 text-[10px]">
-                                {log.warnings.map((w: any, wIdx: number) => (
-                                  <li key={wIdx}>{typeof w === "string" ? w : (w.message || JSON.stringify(w))}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-12 text-center text-slate-500 text-xs">
-                <Terminal className="size-8 mx-auto mb-2 text-slate-600 opacity-50" />
-                No se han registrado llamadas a la API en esta sesi√≥n de
-                trabajo.
-                <p className="text-[10px] text-slate-600 mt-1">
-                  Crea una cuenta demo o comercial para ver la depuraci√≥n en
-                  vivo.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* --- MODAL DEL INTERCEPTOR DE API XC (EDITAR PAYLOAD ANTES DE ENVIAR) --- */}
-      {pendingApiCall && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[999] flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-slate-900 border border-slate-850 rounded-3xl max-w-2xl w-full text-slate-100 overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            {/* Header */}
-            <div className="p-6 bg-slate-950 border-b border-slate-850 flex items-center gap-3">
-              <div className="size-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                <Terminal size={20} />
-              </div>
-              <div>
-                <h3 className="text-base font-black uppercase tracking-wider text-white font-sans">
-                  Interceptor de API XC (Pre-Env√≠o)
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Inspecciona y edita el JSON del comando generado antes de
-                  enviarlo f√≠sicamente al panel.
-                </p>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 overflow-y-auto space-y-4 flex-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400 font-sans">
-                  Acci√≥n de la petici√≥n:{" "}
-                  <span className="text-cyan-400 uppercase font-mono font-black">
-                    {pendingApiCall.action}
-                  </span>
-                </span>
-                <span className="text-[10px] text-amber-400 font-bold px-2 py-0.5 rounded bg-amber-950/30 border border-amber-900/30 font-sans">
-                  COMANDO DETENIDO
-                </span>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs text-slate-400 font-sans font-bold">
-                  <span>Editor de JSON (Payload):</span>
-                  {jsonValidationError ? (
-                    <span className="text-red-400 font-bold text-[10px]">
-                      ‚ö†Ô∏è JSON Inv√°lido: {jsonValidationError}
-                    </span>
-                  ) : (
-                    <span className="text-emerald-400 font-bold text-[10px]">
-                      ‚úì JSON Sintaxis V√°lida
-                    </span>
-                  )}
-                </div>
-
-                <textarea
-                  value={apiEditedJson}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setApiEditedJson(val);
-                    try {
-                      JSON.parse(val);
-                      setJsonValidationError(null);
-                    } catch (err: any) {
-                      setJsonValidationError(err.message);
-                    }
-                  }}
-                  className="w-full h-80 bg-slate-950 text-slate-200 font-mono text-xs p-4 rounded-2xl border border-slate-800 focus:outline-none focus:border-cyan-500 resize-none leading-relaxed"
-                  spellCheck={false}
-                />
-              </div>
-
-              <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4 text-xs text-slate-400 leading-relaxed space-y-1 font-sans">
-                <p className="font-bold text-white">
-                  üí° ¬øQu√© puedes hacer aqu√≠?
-                </p>
-                <p>
-                  ‚Ä¢ Cambiar el{" "}
-                  <code className="text-cyan-400 font-mono">username</code>,{" "}
-                  <code className="text-cyan-400 font-mono">password</code>, o{" "}
-                  <code className="text-cyan-400 font-mono">packageId</code>.
-                </p>
-                <p>
-                  ‚Ä¢ Probar valores modificados para validar las reglas del
-                  backend.
-                </p>
-                <p>
-                  ‚Ä¢ El comando se enviar√° al endpoint{" "}
-                  <code className="text-cyan-400 font-mono">/api/iptv/xui</code>{" "}
-                  simulando la llamada editada.
-                </p>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-6 bg-slate-950 border-t border-slate-850 flex flex-col sm:flex-row items-center justify-end gap-3">
-              <button
-                onClick={() => {
-                  pendingApiCall.onCancel();
-                  setPendingApiCall(null);
-                  toast.error("Operaci√≥n abortada.");
-                }}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-800 text-xs font-bold text-slate-400 hover:bg-slate-850 hover:text-white transition-all cursor-pointer"
-              >
-                Cancelar Operaci√≥n
-              </button>
-
-              <button
-                disabled={!!jsonValidationError}
-                onClick={async () => {
-                  if (jsonValidationError) return;
-                  try {
-                    const parsedPayload = JSON.parse(apiEditedJson);
-                    const call = pendingApiCall;
-                    setPendingApiCall(null);
-                    toast.loading(
-                      "Enviando comando editado al panel f√≠sico...",
-                    );
-                    await call.onConfirm(parsedPayload);
-                  } catch (err: any) {
-                    toast.dismiss();
-                    toast.error("Error al ejecutar comando: " + err.message);
-                  }
-                }}
-                className={`w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  jsonValidationError
-                    ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                    : "bg-cyan-500 text-slate-950 hover:bg-cyan-400 hover:scale-[1.02] active:scale-[0.98]"
-                }`}
-              >
-                ‚úì Enviar Comando Editado
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* NOTIFICACI√ìN ESTILO WINDOWS / CELULAR IN-APP INTERACTIVA */}
-      {activeNotification && (
-        <div className="fixed top-4 right-4 z-[9999] max-w-sm w-full bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-md border border-cyan-500/30 rounded-3xl p-5 shadow-2xl animate-fade-in text-white pointer-events-auto">
-          <div className="flex items-start gap-4">
-            <div className="size-12 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center shrink-0 border border-cyan-500/20 animate-bounce">
-              <span className="material-symbols-outlined text-2xl">notifications_active</span>
-            </div>
-            <div className="flex-1 min-w-0 text-left text-white">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black uppercase text-cyan-400 tracking-wider">
-                  Nueva Solicitud Activa üîî
-                </span>
-                <button
-                  onClick={() => setActiveNotification(null)}
-                  className="text-slate-400 hover:text-white transition"
-                >
-                  <span className="material-symbols-outlined text-base">close</span>
-                </button>
-              </div>
-              <p className="font-extrabold text-sm text-slate-100 mt-1 truncate">
-                {activeNotification.detalles?.nombre_completo || "Cliente Nuevo"}
-              </p>
-              <p className="text-xs text-slate-350 mt-0.5 font-bold">
-                Plan: {activeNotification.detalles?.plan_nombre || "IPTV Plan"}
-              </p>
-              <p className="text-[10px] text-slate-500 mt-1 font-mono">
-                Por: {activeNotification.reseller_usuario}
-              </p>
-              
-              <div className="flex items-center gap-2 mt-4">
-                <button
-                  onClick={() => {
-                    setSelectedActivationRequest(activeNotification);
-                    setIsEditingRequest(false);
-                    setAdminApprovalNotes("");
-                    setApprovalUser(activeNotification.detalles?.usuario_propuesto || "");
-                    setApprovalPass(activeNotification.detalles?.contrasena_propuesta || "");
-                    setSolicitudTab("pendientes");
-                    setActiveNotification(null);
-                    
-                    // Hacer scroll suave para enfocar el panel
-                    const container = document.getElementById("xtv-panel-main");
-                    if (container) {
-                      container.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }
-                  }}
-                  className="px-3.5 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-[11px] font-black uppercase rounded-xl transition shadow-sm"
-                >
-                  Ver Solicitud
-                </button>
-                <button
-                  onClick={() => setActiveNotification(null)}
-                  className="px-3 py-2 bg-slate-850 hover:bg-slate-800 text-slate-300 text-[11px] font-black uppercase rounded-xl transition border border-slate-800"
-                >
-                  Descartar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* NOTIFICACI√ìN DE CUENTA ACTIVADA (CON VISTA PREVIA Y WHATSAPP) */}
-      {activeApprovalNotification && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-fade-in text-white">
-          <div className="w-full max-w-md bg-slate-900 border border-emerald-500/30 rounded-3xl p-6 shadow-2xl relative text-left">
-            <div className="flex items-start gap-3">
-              <div className="size-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
-                <span className="material-symbols-outlined text-xl">check_circle</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="text-[9px] font-black uppercase text-emerald-400 tracking-wider">
-                  ¬°L√≠nea Activada en Base de Datos! üöÄ
-                </span>
-                <h3 className="text-base font-extrabold text-white mt-0.5">
-                  {activeApprovalNotification.detalles?.nombre_completo || "Cliente Nuevo"}
-                </h3>
-              </div>
-              <button
-                onClick={() => setActiveApprovalNotification(null)}
-                className="text-slate-400 hover:text-white transition"
-              >
-                <span className="material-symbols-outlined text-base">close</span>
-              </button>
-            </div>
-
-            {/* Vista Previa de la Cuenta en BD */}
-            <div className="mt-4 bg-[#111214]/50 border border-slate-800/80 rounded-2xl p-4 space-y-2 font-mono text-[11px] leading-relaxed">
-              <div className="flex justify-between border-b border-slate-800/40 pb-1.5">
-                <span className="text-slate-400">CLIENTE:</span>
-                <span className="font-bold text-white truncate max-w-[200px]">
-                  {activeApprovalNotification.detalles?.nombre_completo || "N/A"}
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800/40 pb-1.5">
-                <span className="text-slate-400">USUARIO:</span>
-                <span className="font-bold text-emerald-400 select-all">
-                  {activeApprovalNotification.detalles?.usuario_propuesto || "N/A"}
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800/40 pb-1.5">
-                <span className="text-slate-400">CONTRASE√ëA:</span>
-                <span className="font-bold text-emerald-400 select-all">
-                  {activeApprovalNotification.detalles?.contrasena_propuesta || "N/A"}
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-slate-800/40 pb-1.5">
-                <span className="text-slate-400">PLAN:</span>
-                <span className="font-bold text-white text-right">
-                  {activeApprovalNotification.detalles?.plan_nombre || "IPTV Plan"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">CELULAR:</span>
-                <span className="font-bold text-white">
-                  {activeApprovalNotification.detalles?.celular || "N/A"}
-                </span>
-              </div>
-            </div>
-
-            <p className="text-[10px] text-slate-400 mt-3 italic leading-normal">
-              La cuenta ya est√° guardada de forma segura en la base de datos de Supabase. Abajo tienes el mensaje preformateado para enviar directamente por WhatsApp al cliente.
-            </p>
-
-            <div className="flex flex-col gap-2 mt-4">
-              <button
-                onClick={() => {
-                  const name = activeApprovalNotification.detalles?.nombre_completo || "";
-                  const userProposed = activeApprovalNotification.detalles?.usuario_propuesto || "";
-                  const passProposed = activeApprovalNotification.detalles?.contrasena_propuesta || "";
-                  const plan = activeApprovalNotification.detalles?.plan_nombre || "IPTV Plan";
-                  const phone = activeApprovalNotification.detalles?.celular || "";
-                  const xcUrl = systemConfig?.xc_url_completa || systemConfig?.xui_url || "http://vip-xtv.pro:8080";
-                  
-                  const message = `*¬°Hola ${name}!* Tu servicio de TV ya se encuentra *ACTIVO y listo para disfrutar.* üì∫‚ú®\n\n*Detalles de tu cuenta:*\nüë§ *Usuario:* \`${userProposed}\`\nüîë *Contrase√±a:* \`${passProposed}\`\nüì¶ *Plan:* ${plan}\nüåê *Servidor:* ${xcUrl}\n\n¬°Gracias por confiar en nosotros! Que disfrutes del mejor entretenimiento.`;
-                  
-                  navigator.clipboard.writeText(message);
-                  toast.success("Mensaje copiado al portapapeles");
-                  
-                  if (phone) {
-                    const waUrl = `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
-                    window.open(waUrl, "_blank");
-                  } else {
-                    toast.error("El cliente no tiene un tel√©fono registrado para WhatsApp.");
-                  }
-                }}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-[11px] font-black uppercase rounded-xl transition flex items-center justify-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-sm">share</span>
-                Compartir por WhatsApp al Cliente
-              </button>
-              
-              <button
-                onClick={() => setActiveApprovalNotification(null)}
-                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white text-[11px] font-black uppercase rounded-xl transition border border-slate-700/50 text-center"
-              >
-                Cerrar Notificaci√≥n
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showPayoutConfirmModal && selectedCommissionPayout && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-6 shadow-xl animate-fade-in">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <div>
-                <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Paso Final</span>
-                <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Liquidar Transferencia</h3>
-              </div>
-              <button
-                onClick={() => setShowPayoutConfirmModal(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-50"
-              >
-                <span className="material-symbols-outlined text-sm">close</span>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs space-y-2">
-                <div>
-                  <p className="text-slate-400 font-bold">Destinatario:</p>
-                  <p className="text-sm font-black text-slate-800 dark:text-white mt-0.5">{selectedCommissionPayout.requesterName}</p>
-                  <p className="text-slate-400 font-mono mt-0.5">{selectedCommissionPayout.requesterEmail}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 font-bold">Monto de Transferencia:</p>
-                  <p className="text-lg font-black text-emerald-600 mt-0.5">${selectedCommissionPayout.totalRequested} ARS</p>
-                </div>
-              </div>
-
-              {/* Subida del Comprobante */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider flex items-center gap-1.5">
-                  Comprobante de Transferencia *
-                </label>
-                <div className="flex items-center gap-3">
-                  <div className="relative overflow-hidden bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-all rounded-2xl px-4 py-3 flex items-center justify-center gap-2 cursor-pointer flex-1 text-slate-600 dark:text-slate-300 min-h-[44px]">
-                    <span className="material-symbols-outlined text-sm">cloud_upload</span>
-                    <span className="text-xs font-black">Subir Captura</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const loadingToast = toast.loading("Comprimiendo y optimizando comprobante...");
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            const img = new Image();
-                            img.onload = () => {
-                              try {
-                                const canvas = document.createElement("canvas");
-                                const MAX_WIDTH = 800;
-                                const MAX_HEIGHT = 800;
-                                let width = img.width;
-                                let height = img.height;
-
-                                if (width > height) {
-                                  if (width > MAX_WIDTH) {
-                                    height = Math.round((height * MAX_WIDTH) / width);
-                                    width = MAX_WIDTH;
-                                  }
-                                } else {
-                                  if (height > MAX_HEIGHT) {
-                                    width = Math.round((width * MAX_HEIGHT) / height);
-                                    height = MAX_HEIGHT;
-                                  }
-                                }
-
-                                canvas.width = width;
-                                canvas.height = height;
-
-                                const ctx = canvas.getContext("2d");
-                                if (ctx) {
-                                  ctx.drawImage(img, 0, 0, width, height);
-                                  const compressedBase64 = canvas.toDataURL("image/jpeg", 0.65);
-                                  setPayoutProofImage(compressedBase64);
-                                  toast.dismiss(loadingToast);
-                                  toast.success("¬°Captura optimizada correctamente de forma segura (~40 KB)!");
-                                } else {
-                                  setPayoutProofImage(event.target?.result as string);
-                                  toast.dismiss(loadingToast);
-                                  toast.success("Cargado sin compresi√≥n.");
-                                }
-                              } catch (err) {
-                                console.error("Error al renderizar canvas:", err);
-                                setPayoutProofImage(event.target?.result as string);
-                                toast.dismiss(loadingToast);
-                                toast.success("Comprobante cargado.");
-                              }
-                            };
-                            img.onerror = () => {
-                              setPayoutProofImage(event.target?.result as string);
-                              toast.dismiss(loadingToast);
-                              toast.success("Comprobante cargado.");
-                            };
-                            img.src = event.target?.result as string;
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
-                  </div>
-
-                  {payoutProofImage && (
-                    <div className="relative group shrink-0 size-12 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 cursor-pointer">
-                      <img src={payoutProofImage} alt="Preview" className="size-full object-cover" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Notas de referencia */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Notas o Referencia de Pago</label>
-                <textarea
-                  placeholder="Ej: Transferido por Galicia. Transacci√≥n #123456..."
-                  value={payoutRefNotes}
-                  rows={2}
-                  onChange={(e) => setPayoutRefNotes(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800/50 ring-1 ring-slate-200 dark:ring-slate-800 rounded-2xl px-4 py-3 focus:outline-none focus:ring-slate-850 text-xs dark:text-white"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowPayoutConfirmModal(false)}
-                className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-black rounded-xl transition-all"
-              >
-                Atr√°s
-              </button>
-              <button
-                onClick={async () => {
-                  if (!payoutProofImage) {
-                    toast.error("Por favor, sube el comprobante de transferencia para liquidar.");
-                    return;
-                  }
-                  setIsSubmittingPayout(true);
-                  try {
-                    const updatedPagos = [...finanzasComisionesPagos];
-                    const nowStr = new Date().toISOString();
-
-                    for (const item of selectedCommissionPayout.items) {
-                      const existingIdx = updatedPagos.findIndex(p => p.cliente_id === item.cliente_id);
-                      const record = existingIdx !== -1 ? { ...updatedPagos[existingIdx] } : {
-                        id: Math.random().toString(36).substring(2, 11),
-                        cliente_id: item.cliente_id,
-                        cliente_nombre: item.cliente_nombre,
-                        plan_nombre: item.plan_nombre,
-                        vendedor_email: item.seller,
-                        reclutador_email: item.recruiter || "",
-                        comision_total: item.totalComm,
-                        comision_vendedor: item.vComm,
-                        comision_reclutador: item.rComm,
-                        creado_al: item.creado_al || nowStr,
-                        pagado_vendedor_al: null,
-                        pagado_reclutador_al: null,
-                        comprobante_img: "",
-                        solicitado_vendedor: item.isSellerRequested,
-                        solicitado_reclutador: item.isRecruiterRequested,
-                        solicitado_vendedor_al: item.requestedSellerAt,
-                        solicitado_reclutador_al: item.requestedRecruiterAt,
-                        notes: item.notes || ""
-                      };
-
-                      if (item.type === "vendedor") {
-                        record.pagado_vendedor_al = nowStr;
-                        record.comprobante_img = payoutProofImage;
-                        record.notes = payoutRefNotes || record.notes;
-                        
-                        // Calcular estado de pago
-                        const recruiterPaid = record.pagado_reclutador_al || !record.reclutador_email;
-                        record.estado_pago = recruiterPaid ? "completo" : "vendedor_pagado";
-                      } else {
-                        record.pagado_reclutador_al = nowStr;
-                        record.comprobante_img = payoutProofImage;
-                        record.notes = payoutRefNotes || record.notes;
-
-                        const sellerPaid = record.pagado_vendedor_al;
-                        record.estado_pago = sellerPaid ? "completo" : "reclutador_pagado";
-                      }
-
-                      // Guardar en Supabase
-                      await supabase.from("iptv_finanzas_comisiones").upsert([record]);
-
-                      if (existingIdx !== -1) {
-                        updatedPagos[existingIdx] = record;
-                      } else {
-                        updatedPagos.push(record);
-                      }
-                    }
-
-                    setFinanzasComisionesPagos(updatedPagos);
-                    localStorage.setItem("g3d_finanzas_comisiones", JSON.stringify(updatedPagos));
-
-                    // Liberar bloqueo de concurrencia
-                    const updatedLocks = { ...(systemConfig?.commission_locks || {}) };
-                    delete updatedLocks[selectedCommissionPayout.requesterEmail];
-                    const updatedConfig = { ...systemConfig, commission_locks: updatedLocks };
-                    await apiService.updateSystemConfig(updatedConfig);
-                    setSystemConfig(updatedConfig);
-
-                    setSelectedCommissionPayout(null);
-                    setShowPayoutConfirmModal(false);
-                    toast.success("¬°Pago de comisiones liquidado con √©xito!");
-                  } catch (err: any) {
-                    toast.error(`Error al procesar pago: ${err.message || err}`);
-                  } finally {
-                    setIsSubmittingPayout(false);
-                  }
-                }}
-                disabled={isSubmittingPayout}
-                className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5"
-              >
-                {isSubmittingPayout ? (
-                  <>
-                    <span className="animate-spin text-sm">‚è≥</span> Procesando...
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-[14px]">check</span> Confirmar Pago
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Modal de Edici√≥n de Encabezados (Inicio XTV) */}
-      {editWelcomeModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-950 rounded-3xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 text-slate-900 dark:text-white">
-            <div className="p-6 border-b border-slate-100 dark:border-slate-900 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/30">
-              <h3 className="text-sm font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <Pencil size={16} className="text-amber-500" />
-                Editar Encabezados de Inicio (XTV)
-              </h3>
-              <button onClick={() => setEditWelcomeModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-100 mb-1">Prefijo de Bienvenida</label>
-                <input 
-                  type="text" 
-                  value={tempWelcome.welcomePrefix}
-                  onChange={(e) => setTempWelcome({ ...tempWelcome, welcomePrefix: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-semibold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-100 mb-1">Sufijo de Bienvenida</label>
-                <input 
-                  type="text" 
-                  value={tempWelcome.welcomeSuffix}
-                  onChange={(e) => setTempWelcome({ ...tempWelcome, welcomeSuffix: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-semibold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-100 mb-1">Etiqueta del Bot√≥n de Cr√©ditos</label>
-                <input 
-                  type="text" 
-                  value={tempWelcome.creditsLabel}
-                  onChange={(e) => setTempWelcome({ ...tempWelcome, creditsLabel: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-semibold"
-                />
-              </div>
-            </div>
-            <div className="p-4 bg-slate-50 dark:bg-slate-900/30 border-t border-slate-100 dark:border-slate-900 flex justify-end gap-2">
-              <button 
-                onClick={() => setEditWelcomeModal(false)}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleSaveWelcome}
-                className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-md flex items-center gap-1 cursor-pointer"
-              >
-                <Check size={14} />
-                Guardar Cambios
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. Modal de Edici√≥n de Tarjetas del Launchpad (XTV) */}
-      {editCardId && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-950 rounded-3xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 text-slate-900 dark:text-white">
-            <div className="p-6 border-b border-slate-100 dark:border-slate-900 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/30">
-              <h3 className="text-sm font-black uppercase tracking-wider text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <Pencil size={16} className="text-amber-500" />
-                Editar Bot√≥n: {tempCard.title}
-              </h3>
-              <button onClick={() => setEditCardId(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto scrollbar-none text-left">
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-100 mb-1">T√≠tulo del Bot√≥n</label>
-                <input 
-                  type="text" 
-                  value={tempCard.title}
-                  onChange={(e) => setTempCard({ ...tempCard, title: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-semibold"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-100 mb-1">Badge Informativo</label>
-                <input 
-                  type="text" 
-                  value={tempCard.badge}
-                  onChange={(e) => setTempCard({ ...tempCard, badge: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-semibold"
-                />
-              </div>
-
-              {/* Icon selector */}
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-100 mb-2">Seleccionar √çcono</label>
-                <div className="grid grid-cols-5 gap-2 bg-slate-50 dark:bg-slate-900/30 p-3 rounded-2xl border border-slate-150 dark:border-slate-900">
-                  {Object.keys(ICON_MAP).map((iconKey) => {
-                    const IconComponent = ICON_MAP[iconKey];
-                    const isSelected = tempCard.iconName === iconKey;
-                    return (
-                      <button
-                        key={iconKey}
-                        type="button"
-                        onClick={() => setTempCard({ ...tempCard, iconName: iconKey })}
-                        className={`size-10 rounded-xl flex items-center justify-center border transition-all cursor-pointer ${
-                          isSelected 
-                            ? 'bg-amber-500/20 border-amber-500 text-amber-500 scale-105 shadow-sm' 
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                        }`}
-                        title={iconKey}
-                      >
-                        <IconComponent size={18} />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Cargar nuevo SVG / PNG */}
-              <div className="space-y-2">
-                <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-100">Cargar √çcono Personalizado (SVG / PNG)</label>
-                
-                {tempCard.customIcon ? (
-                  <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-2xl border border-slate-200 dark:border-slate-800">
-                    <div className="size-12 rounded-xl bg-slate-950/20 backdrop-blur-sm flex items-center justify-center border border-slate-200/20 shadow-sm p-1">
-                      <img src={tempCard.customIcon} className="size-full object-contain" alt="Custom Icon" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">√çcono Personalizado Activo</p>
-                      <p className="text-[10px] text-slate-400">Guardado en formato base64</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setTempCard({ ...tempCard, customIcon: null })}
-                      className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                    >
-                      Quitar
-                    </button>
-                  </div>
-                ) : (
-                  <div 
-                    onDragOver={(e) => { e.preventDefault(); }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const file = e.dataTransfer.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setTempCard(prev => ({ ...prev, customIcon: reader.result as string }));
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = 'image/png, image/svg+xml, image/jpeg';
-                      input.onchange = (e: any) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setTempCard(prev => ({ ...prev, customIcon: reader.result as string }));
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      };
-                      input.click();
-                    }}
-                    className="border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-amber-500/50 dark:hover:border-amber-500/50 rounded-2xl p-5 text-center cursor-pointer transition-all hover:bg-slate-50 dark:hover:bg-slate-900/30 flex flex-col items-center justify-center gap-1.5"
-                  >
-                    <span className="material-symbols-outlined text-2xl text-slate-500 dark:text-slate-100">upload_file</span>
-                    <div className="text-center">
-                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Arrastra un archivo aqu√≠ o haz clic para explorar</p>
-                      <p className="text-[9px] text-slate-500 dark:text-slate-100 uppercase tracking-widest mt-0.5">Soporta SVG, PNG y JPG (se adaptar√° al dise√±o)</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Color Gradient Pickers */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-100 mb-1.5">Color de Fondo 1</label>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="color" 
-                      value={tempCard.color1}
-                      onChange={(e) => setTempCard({ ...tempCard, color1: e.target.value })}
-                      className="size-8 rounded-lg cursor-pointer border border-slate-200 dark:border-slate-800 p-0 overflow-hidden"
-                    />
-                    <input 
-                      type="text"
-                      value={tempCard.color1}
-                      onChange={(e) => setTempCard({ ...tempCard, color1: e.target.value })}
-                      className="flex-1 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 font-mono"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-100 mb-1.5">Color de Fondo 2</label>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="color" 
-                      value={tempCard.color2}
-                      onChange={(e) => setTempCard({ ...tempCard, color2: e.target.value })}
-                      className="size-8 rounded-lg cursor-pointer border border-slate-200 dark:border-slate-800 p-0 overflow-hidden"
-                    />
-                    <input 
-                      type="text"
-                      value={tempCard.color2}
-                      onChange={(e) => setTempCard({ ...tempCard, color2: e.target.value })}
-                      className="flex-1 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-800 dark:text-slate-100 font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 bg-slate-50 dark:bg-slate-900/30 border-t border-slate-100 dark:border-slate-900 flex justify-end gap-2">
-              <button 
-                onClick={() => setEditCardId(null)}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleSaveCard}
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-md flex items-center gap-1 cursor-pointer"
-              >
-                <Check size={14} />
-                Guardar Cambios
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                        xúÏ}ms‰Fzÿ˜¸äﬁ©Õi(-áoÀ’ä^.Më\ù]í&π{w^+\hŒ@ã  C.≈cUÚ¡˘‚î/æsú™+«äRπr\eUÏR•Ï“ßÍ¯OÙ¨üêÁÈn †tœ)Óyq'ÓËóßü~ﬁ˙y!Dæ.g~ÔﬂçÎíP/¶‰BÎaBÊÊ»é‹ƒäàƒ‰‘ç›cè∆ö/€Å'ÈKœc˘÷ê∆dUÛuBN\/°u6<ó˙I‹ZaW˚eB∫ñmØÀ?ü!´è	|Èçƒ Ói∑¢	VBböPè⁄I6‹n7åË)ˆ≠›æ–„≥6öËàÕN‘=◊∑ΩëCcx¿` ∫èÍ¢ú∆Só:Ÿû«;0±’Nå|á:‰8àÕ∆ûï–Ÿ•˘y‚X—Îï¬›·Óqˆl‡&T¸‹?=Ñü˙&ôµœ-ˆ|;	ÏQºπ~üﬂ[Ü{ÉŸ•ﬁ29cÌQ—l∏>¨Qßu–smkˇh.¥>ì‰πá≥Kù««(ô#‘yV4nCœ„ëπ6¯Id≈ÙÍ¨q€Û,_¥ìXN0n3/®oªCú‡ÿM¥ÆÃ#«=ïﬂ:ÒË(2ågmÑlD˙V8ª†—¥áñˇx#¬˛ª˙∆4«æÎºx<Jí¿◊⁄FÅknø^ΩËê§JÉ‡Ücã] »›;qÒ∆Ã‘61)Æ¬ß4 ∑€b∫?K˜qá¶0«è›6k^≈|ÉÚa7∂o9º7ÒË™.ì+DõPÆëŒÆ=Úê;fkØ7>ºVHÁ5~SgÙê„¢4mòé.œy¥uNwONHÏ~P^Xºlßs¸öÅYõt2F: z4«˜ùïò2q]4|/¢6P^$ö„6±èOg˘Œä‹˛ È<^∑mN∫⁄ZÇ'¢¶'∞j9çè$«Ås.èÄÏ:tˆúà|ª/§Ù¢pòvQæP…çEa∞ç4p—’ç∑ﬁÑ.4§!≥¢xyBÌÅutös/Ú£µæË”3≤	Î*[òÈıirË)P˝G®ç-ı¸‡¨€*ú•S‹§√Ä¨í;ÿΩÎÖÄç8Äƒ“m {°ë∏(ÁÚß¯t•sòZÀ†∂Ï'‘˙ÍX	h.ıŒ>69b≈nﬂáΩ£5I@Txö:LæÅiZ≈è1»Íæ”>πnòc^@&´´´§oçiÎåƒ]„îá›:»µ¬„=\à÷wV™≥–¿—5ÚäÚÓEÂÌÀWÔÁdH€)”ç;˙`Ÿã\{R∏Ñ¨çüˇúÃk@g^l9'ûpÄ6(†˝1∂Ô¶'A4 í£P-/x4!)Á˘SÎvﬁ*È∏>yzıı$Ï÷sOH1‘∞[pà"1j!¨Ì ka
+xÈÙí‡i`q¿nT#Ål†Òj˛ßÛ\ﬁÚ—≈ÀOÔit¡(Ç›≥8Î∏}7ÈË)˙C◊%‘µv{‘e⁄E4EæÜº¯(â4FÙöûØ^»l∆Ã‰pÒ™™ö‹’ÉzŒ"5E_P,@9äÇUûπ˚ÛôŸÇ›˙Ó-ÎÍ∞l%mﬂVÎa·ßE-ÎÚU;¥ÙﬂƒQ
+•\◊“Ω°◊Gâ&<íÛ:≤‘~}º—Ö"{û:´˘RÍ)ƒLmX~®KµDœ¸B:H{†^ÇÿC–!Å˘’dî$/"§◊Î·õ˙fDº∆≥πÚ©∂Ÿ’ÿ¢ç◊TlµxçiØ≈KÿlG‰éê«ÅìÅ±ñ=l UÕ'µ∑xΩÖ∆[º¥Ã†Û6*ºŸs5‰Œ£'â.±+ô-„–≤AqûùÔ-k∂ mÑ√g‡'≥0ä»:<G6∑=LóD∫∑–™}À„∑~0<éË»•!Ü •aæÓËbœ£πP{vzÜ]xï!∆¿Òra>|Û©Æ˚ÀàÇ LÑ£A„L6∑„3†¥úPÔÍo°Ω@HF`*ı˙£iÊXG:z^~"z‘ I¬xenÓÃÍÈ‹]y ΩàÇd”Ó‹À??˚—ßs˝{§”ô—4‰ã3À’Œ—1®BØıç±xE‘[Ì¯ïFë.}HØíÂ®“»Úú‹ä%›˚àãuy“{r+¯Ï–∂ÛE}hbY6å≥è'†ëôë≈;x<cŸh¥Éà¸d`%Òzö4e∆#PﬂIπÛ⁄Ü\ÒÚú•ˇ∏ñÌó∑™a’5|t|0!Â◊;¢Rµ0 àG]uƒ1£Ü2iƒAyæb@˛tﬁjœ<ö´∫ä!‚°7{ŒZûgNˆM¥—1gip»»Ø‚Q£ëhMàoù∫}+	¢ûÌπ·q`ENÔ,4;†ôJ…∆˙≤.^I`≈I/Ÿ6ç„n'=∑É–µú†c‘ö∂LåWÛëÈBÕëÈC˘»¥∞∑D“Õ∫ß¶xÁç <O)˚Çe◊?ÅKü◊¶ÿo+ù€ªF:∑√>ΩjÉzû¡êN-oDπ—,-ò†6ê@†"…=2å˚Sß%…D{‹ê¡∏Êí{…Í`i⁄Q”Î∫hâ…ˆ{ÀYBäç7…Tˇé-(Æ€…nø ?ﬂ[66	∆§`˘<#|3ªHBﬁoi^~î35–…_ìQ“»‹'ÆÔπ>Ö€‹÷<˛‡w40⁄Ä¸ƒ”àa<ˇ˙PR™˘ùè§ìÈ¡%,«kÖué¢–£yØ‚ª‹≠∏UÈW‹7ÍXﬂÃa`ﬁIÙµb©‚ZMbL‰\<->Ç1%†YY1≤ﬂ≈K≤ó~ü∂È(ÑZR¸P°V.iKè”óvm‡ˆ÷^¨å“èAÖ:%ÅY≥	mñ¬=s/§ì¸K4ø1îàÈ–’≤6,Î¢≈$ÓùJ≥HÈà@6[Ê£LÔö)?w/ä0ôìCÍCq$Ã»U©˝Â¬ï0 ˘ÅO¶˝›¯üŸˇØcÇzÆ∞7Ñ∏⁄¡ëÅπjçÖ◊/øH\*yk!3Ûüå<ØU‰2ê≤2UâG¯öP'vã,È‡˜äòÉ7Ö+.Z…Á"öÒ∞˛†§J`∫÷Æt7ÓEÓ¿c—Dà”[∑˜T˜¿Œ Ld¬Ûe·„≠-NòÈWÖéœFq‚ûúœ‚·O*Äh∂õ€∏«Ì≈IÓEAhı-<”e⁄+:˜>˘8HÆæÒ…ñ√¢g…A‡iÏ"	≠»"ÎŒ–ı›8¡’éhLﬁü”eKÄ1Ïe≥S÷Iç4FjO≥NpÚ@g˘·<∫MÍ≈Òk|ÎËüÀF]ÿêÏ®Vk˛hó´3ÚÎı·F‹˝§Ëõíè†‰õ2˜¿à äXÅc©ƒıaˆ–’’ª3ÃL´/gzI;mü˙¡)€jõn~æ—í¿	L∂óÈFô¿ñYÒ{Dõ4±\/f˚≈ƒmÌ”œG4Ü|z&Ì:„V‡ıÉÑÜ›é√«bfòî&Ö‰0%÷b◊Òd¢√0
+éA_ß”hk»ı:∆sìõ¡˘mkDl»W%HÅù˝Máº1ä"ËÈıG›Nƒ6ä4ä-¨ÅΩYEè]ﬂq˚”Ô22+Ó}ò“YÓó◊HO„∞À≥Ÿÿ¿YEê…î@“I2∑OOÄë6Œ∆!ì9ëC @€ñˇ;"gêÅÂ;›í–‘üˆ•|rˇ©∂èó
+Ö/|’~I¬Nv≥z4¬üùœ=Æÿç≈3vÔC3·ÄΩ≤AÊO/ﬂ«ó∆íR‹∏^˘‡0≤‚¡‚ç…zÕN’⁄÷© F÷LN/G` k}Ä€∫ÓÅfTŸÆãñÉE9<¢|¬óû#-6jzè0;H≥Ìú„ƒ“bÛ™ICæôµFI@JrvYˆ˛∞YgoD@≈q√õX2ßÁˆÿµˆkÙ?sù÷íù ÿ-QôÓF˘ÿÆkÇPÀâÇÚdd°t2ÇæÈCÎÕÏNC¿Øe¨{—à[ƒ∂Ü«.P‹ÄPèe»âêàZû˚ª=Ú-r|ımRè”Ï¶Î∏'Â⁄w∂ç[∂fÛ‘æSÛÉÚvi„^ŒtãJ2€'=r∞µ±±}ı´≤πEûlÔ¨Ô¸—˙˘Ÿﬂ⁄ƒ;˚[OüÆ?€ﬁ⁄9‹Â7^lÌlnmÓÓoêÓO_Ãî∏ÔÖùKf,ä∑s¥⁄ˇ¬äQ4æÅªS˚Ó™™Sœ£—÷‰ˆß¡lÎU“E∆π÷£xèõ3Ã
+øn äw·[‰´!ﬁiD6nq.¨!®µ–^≈Úâà·–Ú©«(m±`‰ÃNt[Cy3k¬Ìáo[!(ºÄû{ÈVû≠†Œ±d4 ç‹vIhaÿvDmoîpôH9x ^ ¬¯Ã
+E¯'|z3€Ò=¬ˇ}\ÖZæp˚‘rvÔ$à∂,{–ç‘"ÜfE=◊?Ö˛ú#æP t•∑"~K¨%è≥¬~π!ÂRﬂ+∑≠|J¡Œ {R	n
+EoG¢‡N√àA E?qAIóæÅe8ßHh:*Ècby^~ú≥ú≈Ñ9ÅlïT)kA’û¢!óÆF·ÀAˆ‚º cÌ9~äUN±B =G‚Uˆeç≈#F3$l$GÚiﬂﬁ;|°åoÊM¶q∂—e)ŸdßóF)7){¨≥åÖ¡ˆòÅ0˛âõ– 0:3ÿ|°˜<›ÉxB’âàÍΩ√ªQ‡k’Ê®ôøC&ß)lm‡ãNpÑ<0≤Ω
+ˆmˆ-ÔjÜ∑¨j„6`0nCÅøH°vFË√ê$À0Cìy≤VÛ€
+YEô»‡&wN ëÊÇç∆‰–k‰°°÷L4ÙÃJ=¶u3PΩOÊ{`*⁄ŸOë°•©Eu≤W˜¢ ‡‰‹∑a–¸¡„ãΩÆøßl{EÕµõfìÌè|B˘ˆY{rYàähF‘ÿ≠b¶ï≠UnÂÛÌ É-Mæ0ÜŒ¶ﬂÅKv1Loü:3ù&∞Ñ÷9Z.a8©®∏ë±÷=´(6ÿÏˆH ìícÂ27PséÒ{6ïf¯ˇÿ£,Ö‘QCa}Ωó Cx~yè—˘∫áSë·=ÑÃâÂ≈¥â≥dª∆`8π‹wz¯tn0UÎµÕü¶Ù*k8•∞¢˘î»f∫∂Z!T¯Æ›AD©ãkö«˙qÄ©íÚûîzù∑Ö,Ò&π£]Pù:»áüƒ]^´rV&Yn¢˛–6ya?¨â%Z!Û3Í∑Í“„¯FBÊV–‘<kúj#-‡)n—5Åc„BËÙ¿Ú|Zo∫Û˜–g3ºjíøTÔG‚˝(_É˛E∂ka*¢õQËpgﬂÒÅi“Ø¥π®‘\î7◊∂Ø“±â*Z$BwÓ§kûkªå•∏nDl⁄œ—•Ωá(mñœb=)4ﬂ0¯# \;+çg≥ho_∆ıˆÏ¸tr{ÿW∂-=r‰y¸ÛÛiT˝ ¡◊ä÷¯/rıÍë˙L:ó
+V4"#”ßπÑ√ﬂP‰bhoHí◊W$Ÿ^˝0óõ~€©Ì(≥Z~Æo!S‘?ü÷ˇ5º%∂tÕãçørXÛf√o2ü™{¢@™Î $ú∂~A”Ë™ÒπAkmÆÂ…
+âiyL"5{¢∞È’œ∞}ZÛ:7'XﬂMŸ◊tÒ,sx€¯≤$t®⁄lÏ¶û¨5;çì
+òF¡Ø*.UÜïaÔ	XlΩ˛’∑>DÅG∫{x–_<óI∏h{Ê∆$◊LÓëaÄG–óƒxDç ∫–ÖœŸ7x'tÉÃ≠≥"∑û“&(πeüÙ’™°05F¡ô⁄–#($¸ﬁKm=
+4¬ë8äß PT√„Ù0Ö‡å¨≤¯ïÍÿ∞5‘)ŒØ:È÷	¢m˘éùΩp¿⁄MºÈÙìh§`Õ¬VB#‘
+™M»∫uıÂÜ|{…ú˘îlhô’˚EkXKúìåŸàƒã∆lÅ„¿ò/gË4QÁ»ø&@kï*KÆ∆ˆç´Ø<{‰±§πdxı∑Äxv%ÿä#⁄\0ÏÄ™©∂s≠±ü¨Dç[§È;QOÊÑ
+€0–üëMôy¯f¯ä“b‰ˆµ«y>Ë/ï…ñ&¡≠ ”û¡ML ÁŒ„/D3°Ã÷¢ så3õ»`6cÆH˚Tnd&}Ô%R£uQw¨“0œnò5≠¥—sfÇ√-†aˆ⁄´í’5¿ßõAqA4Yb•’Z˚ï‡5ö‚-ÖH£	]m<1-o∑Æ*∞‚+c¬¥§rãöÑWÃÄ9<Á6m—7\îß‚Ö}÷~≠ˆPqùxñ≈Û¥ãtN YãPü’û∫˙÷K\îFóÊâsı5J£(√:ôÛóCcm2blÀ∂<˜ÿ´i†ú±è“ó$ù´˝#íÅ%Áõ÷yºé‡¸yx]JÃ?K∫0™˜…‚}¯Û`>˝≥0??_=ûì»ÃT@*éÎûÖOÛ∞—Q¥tGµ^)v’ÿÉ¶~¥]s∞≠::4ö„‰⁄z†®$◊–ÁÎrá<^-b¢JêSƒçÖ#9sbæ>0¥Íı<Í˜ìv±†nƒÅ>ü“ìd€Á-ÏQÿú8≈•˘ﬂ√ùÀN°}ÿâÆı’6n¿tìñwz≠é¡º]gµ√]í–yˆ◊,˙ÂYÆO£é*c∆•«∫~mX«0G††ΩY>÷ÅXw£cˇò$Á≠q©.{\÷$û˝s“jG	I)Yfﬂx$ú}ê˚ƒ7á–√òùˆUCL«êÔ+cÎéirFÅ>b|›˝ÔAÛ¥Åz	öºL+·“˙⁄[Ê¡ØßÙ∏/A4è†’Ú%„T˘˙˛À_˛_ÚÏÍî"¬#<Îgﬁ”˘h∞XıcıH}ﬁè
+~¥≥9%≠qùOƒë39«Éj‹ô/2æﬁ0â¡b-r49|™ùt’^ØM©Û¥Q±”◊ÇG⁄=4´åò√+Ò‹œGÆ#^Á∏M*bÓ˙ !¿cI2≥U˛ ay_]å<¢CËkª¥ªßVùÉl≠slúö„-J±<≥ ∫õ"ß:∞£¿Û∫ÄL∏SÎù^‹z˜q„-éI≥ ;+ÍÇ/Áh≈_Jq ≥ós¢‡FVSânXNÄ8;±HŸwÊC≠ÑH™}˜ü˛yx0–»Sk‰€É–Ráœ7=à’ÆaF≥RPü r1;kjR·õ”vÅM·˛‹êeVM’«6Ò≤èàk<\…ø.Ø/}Ωﬂ»'8◊¸Ã"+d+ó§ã£ö„ÙˆõSñtC\tY∆¡”Í38¥Û¥O5·nrÚ£úÛHh]‰AÂëEK$∫ïôîrÒä«KI[˜ÓÖJ\#ÔI9ñKyñkÚ0,’$zyè¨∞ˆ8w^.0ıe%S_R2ı˜._]6∆UÄ∆˜’%¥Ù†1h©zÕ|låTÀìKM ≠Êh√‰‡R¢êîf 	C⁄◊\;˘∆Éö‰≈E◊ÂTW}©}’YT£r:ﬂ˘ø!Îá€/vIFogÿ†æ˚≈7do˝Ä›]∆õÕ!\-[¨9$M;‘«0ìÿHò¥÷k®ôtsT'œvÖÅﬂØå¨5cìú™ÌB•%^ÂmfÂY¿%a∫ [ˆ)~≥m±—<Æµ„Ù≤SG`É¿Öq%{ÌπQ⁄”7qh†è&é ÔtüL¡∏yL∑∞&≈«^˘ùQ>î¢‰©3∞z|k•jíkÖâk/Æ∞\aF„÷<´>v¯ì6d“
+‡ö≤Áä∞Eæ´¢∏ã
+vúsÙf˛±	⁄Å∏}?Âëoè¨íÀ≈T˚ï∏ŸT4ﬂª›ÚÒ‰Ö≥æôjv1≤æ0ŒÊ’Â˛K)∑6í:%y*«Yu/Ì•Äæ˚oø (¯“
+Ä™)£ºkÌQ=!øß0•ø˙ëcÃôPòêÂ:SùMÛûòêà/≠êmø—òæ£≈¶ª/ynø£ÊS¢ÊŸ=fÿ!|«¶Á«ﬁ®êõÇ}ó)πx@üå¨à.æ#·H¬+æî]ﬁrôêó·ıª@ÀÀ˝ˆêÛ˚‹í∆›+ë‰íÒÔÊø–êﬁÁBé„Ø◊¸¥?ﬂ|“æS˛II¸tâ¸uX÷`8†…”¬9AóÅuf|D?€≈ïØNµêyñÑáo“Á°±ü‹`1V1¢ØO’]W¯F}PvÈ1•ÎÌâY¶H€õ©{…ò“ÿé†‚AIﬂäê‚U°cò	Y'µl3%7úPl±¡8Õ.-Â‘áﬂÜÊcíı&£“≠≤o;~Ê"„üÃäbít-ï›X,Á0ê∞”4Xo;’ùö®M–≤[Ùîmæ _r≥oz`≈,øπÉAãÂ›4âV≈ï†eFB≥#˛àûÇB-ı3[oj‘ÖP„Q,Ïƒ◊ì´âÍ(èzèîœ
+yŒéuJ˚Ÿ·°áıQ∏˚CÊ˚°wñÃá N«∫¥ãyœt8ÒÄfâ<p·Òl¯¶Œ…Ã˚!Igqhw;∞bGπ1^«ˇÅ°1à%ÖüP:] 6lÀçÈgëñ›Úü‰c‰I¡J„l@(Lø/ı£®≈Nñ6˙ru£Á$°©´ï¨+63ÿüZ:®™î	˚®>i_]b˝∫-˝óÛœ•03r.¨Í∆. ú¢WDù€ãS8∏wàƒÆÔø¸Ûﬂ.Z0«6)Ù∞è⁄5ÌÜ‘πmâr[∞´‡©Vèg7éi
+\+µëÀﬁ ﬁ]Ê5U©gÙﬂ˝˙/ˇÂü~ëj<ëLœÑa°Vh"hc»áÎ£√÷≥Ì≤±∑ww∂0¡Âã≠ù√ıÉŒ—∆ØÍ7Aù$[ÁUVÚ∆©d›&&Ñ°ô/‡nõ©‹ÿêÔ∫÷÷%ÈŸícVÊI±˚§}r™A]∫„°⁄•ÓèÌ“›∂Ì·Ó◊ß”5W-Í‹™µjŒ}ˇÂ/ˇû|ÇÆπ¬˝mü&."≈π¥Ø⁄Ê37∏ﬂ:gM_ç!K˛…Ë&È¶gvÁ$ÕFB<…3YÃï≥j¶v{&≈£ìsì‚¡gŸR…P#ÅvÛ˚Zô‡ìÛ˜{¥-9πq©ùEœû´‹¡2vº:Ämc@Ì◊«¡∑óA¿™Íwª¢yçZ
+,|2}\´Rà\!$˙?D¶ã=Î<%›óüjtﬁñ5Ωµ¿ÉJêXî›C´Æ◊eﬂÏ∫ç-Y©4
+î’,¢8Â∞9sœn=(rË§ ÁE» ≤J_ñS$≥^âñ]ﬁk\·⁄ãìµ%k#B5 EÄ}˜ﬂˇ3∞\ﬂ¶»&ÏFÉX÷!Ãr ®T§à≠h)^¶ì˙øÈp¨eÙ≠Ö+*YÒçSô∞¬Ë3ü”2Ø«t¨´¢”⁄Z∑%ì®¬”lmg1v—"-!Ÿø˙*t[≤∫k0ä&©ÖiÌæ ¢Ì⁄!&\Ø±ä4qÓA=∑èIW∏PÃRûVr≥¥¶aiÍ!sŒ=Hp[“—ËVÌIõ!ÌÂ~÷X?ÖÜi⁄ö:ês¬5˜í?iÿïàı,∑éŸƒ˘«¨ΩÜ/gX>h±n≈Ã4ö’ëÙxt	ç4€N+NzÒ»∂iw_P¬e3Ks‡∑,µõŸŸ%ŸêG¶°W2À∏‘{•’πV¡ßbhÿã…‰5vTßYçN≥>¨≤»j9ÒËr1T¨`»˚ê™ÒîdïTv/»+ÌÑ•ù§°FÚgˇ'%∫Ï| ÷Eµ:Ì‘QªNŒ€Mh3ˇúk•µ˚yZó1R{µuR¶∏yo)9,Ê•ô&›mËkj‘wøêæÂ≠"¿9zMùÁM◊êa9Ü¯æa2¸Áø)ê·‚  QñW«Äøù‘ ª%–ˆmi*ﬁ$7wMiΩvÌÕ…Ñl≠qU¯Çˆ‡Ú,oêp~j¥_jSEÙ©œ≥ø£ˆ7JÌø˚´ˇ] ˆX˙wò§O—LÃ∆Ã∞ﬁıOÇnG2yÓ‘G«ÍÈ’ûóıvYav˘áBŒèÉ(*ÿRß¶˙µ€JŸSU´Á"ôﬁAcª¥ﬁ3TÌŒfHw4‘h≥a>ÈúN;VºBÍ¬ÿs©Ù"»L∞ù«qÎK@¶Æ±∞ÌÆ’™%c´≈”ÿúÒ¥U∞2g:u?E{UöM)Vç±R≠≥™3&ØÕÎUˆÕH§ü˚61!îÑXgñõà"”b ˘‡°lµ∂|4e ‹xi"πiñs/°œ	ƒ>˘ ﬁ)Tøê"£ºÈMñΩI†≈JZ∂õú3GãÙû=ä‚ Çf$¥ ≠;™¢5ŸÕ™Gç•§xJ¢Ur.– àŒ÷‚Ò˘°ÿÅLàH◊Äå‘◊÷…/}£†V=lçáZiLY—ƒüXv´Ql≥Ç1ò-*£ıΩx"
+›=•&Òø÷qx#@3◊áÌ5{>ã)VN¯'Ù@&©bê¡‹#û.YÜ‡w◊GÍ≤P¸‚¥á◊ÑŒßñ7Ç¡îS˙7ë$4ñﬂá∑∫4ıG‹(Ωﬂ•=@¯>Mz¨É∆∞ú–≥l:ÄL£’[ÙHÆ{è•NΩóπŸ˜zΩ¶	Ik)ÿ!,‹G$å&ŒVóíó∫¯úeîOÏQº˚÷s} È"øÖ¡I@1•/πPSí6Í'Wã-Õ{ÈF‚ã2O˝ÅÎ8 ˝eD◊ ¬®‰Ìﬂºó‰ä’fÄƒ-õŒ¬∆‘%a‹DxÉj9≠D1âÙ¸ ~ÇÂ∞áÖ:êjl„{8dÛ,ÜC›±qAhCú¶iâçHæ85≤≈pıdGÿÃ¯<
+èöœ•ı2ÕDÃÍ®M‘“xvP6ìÎµÖ*∫∏{®‹—Ì∞â #∫ïvQº¶a≈Îr¶GÅJûß(®!Af©∆K÷Tëíu©˘\E,–ﬂËô	bœÎ9E¶WÒÿX}äa–úT˘√|´Á„π÷ÌÆËÊ˙∂º‹ŸÌŸˆÚ®nÌ÷«kZ€/-]0ø&>O·óŸ¡∫A”ó∞kcj¥¡¶nH—'rö∂íÇ"ƒ‰¢∏‘Ó…ÀØ∆ÒÙz4ó⁄ükIé¿™Já≠Å˙Â‹(¡Êˆ@k”◊:Õ3ﬂPá˚ôÉ¿çu˘Ãfê´on
+∞¸kƒ£¸E °ßRÙâŒ0‡ô®Õå§°{=JéÁ\ûéÉ˘¬ÈÏ9J∫U·ÆúCæ5*YÕjD[æ\ºTM -FbÃ
+‹#ÆÛã	c¿Å∂ƒtçí≈µKè`y¨°ªD¨~MMç,ıK?Wı›Ÿ¯{Y°gìwQf-≠ÇÆ»*œ[[ŒKıj6À≤¥•€@a∫JπHÎDó≥Ì2ÑµU»TØñ Qê&'ÄEUÍ3GÛ=.≤b”c¬"+Õ<=úHÀﬁé†vGä¨~∫ÂsÒ£Ù≤π°Ã,TY‰º|5Tû≠^h€{MœW/Ä,_ å¶R¶dnyπ∂R…¢éè_ìöÚ“a;J&odÀ AØ√·
+£01¶◊xF¡Ù åÉAt≈˘Ùö¿»ë^ì;“KO
+#zä#}ŸÎıÛΩíh¢&•◊J€xÉ∆SSZÉÃƒj	ñçYcÃ¡m’/Ω¶¶¶óñ*ò^Ìe ó⁄'ØÆƒ∑;’Í<û’uWëF§@–ZèbåõU 4R≥=ul°°B‘¶QâµŒ„ãj≈ÚKç∞ ∫ﬁe}Æ…YÍ¢T„¸í¸ˆ…ˆÊ
+π(Ó$ì±ò¨R¯& Wï˝K´◊T}˝
+˛ÆÈ÷ì†!™X≥$ﬂòFlìóñD±ágÇÊ&{Ë∆¿}°4äöì∂s}«ÌÚ©©∏#ä8±≈∑ä+$nﬁWØlá$n‚wŒµ·ñ@ïπÁoö≠•ÈjöSË&˙å ±ÑcŸeµÛòÁWH´’ÏÉ†a<HmÍ:vfîx¡ 9¨‘`ï&6ê‡ªô¬•ŒlDè/q»ì,Î≈+◊gÓ#«^êÊÀy˘∞∑å^ £ìÔ`o-®•b^w/dUÓ≠/◊UºzvËr«Í+Òä™YÈÆe∏≈J3çÈC+ÀsK7ålô’ﬂ'⁄9}©ÔhÁj»ØãL]7÷[*˚#Ï}¬V*¸™Ñ∑≤u‹xIeÃ``.Rr¨7”{°∂õC]|óÅ.nU`.ÓèÚ± )´.‹¯9xn`5¶˛)◊≥ælóKÖ\7ÑµÃàÈu!ôö√(8∂`†€√æ)£6ï»Ø±¬∏‰+¶…óûÅ|Ç%›0yy›Í|∆∞Åà—Ï≥¿±ºnçÃ&1éÑi»bÆ∆ïÏ™ãJÕNà8?Ø°›…±^R∞ÄxA‘íï¥zqç£ÛÇ≤tùÈz†”˙û’Ø)]wôÓΩG[Á4u'_lI5Øx[;` øåå8Q˘√∫“P˚y2øtÚ‡µπ“ËQÙGzbB\‡ Õ[ΩXæ,nÅá≤—æ|
+ØüSÙ$◊ X|XËj(R©óvDyó¿FÍË‚ì¬∆ı7T:•»ç-ﬂÜﬂ"~—÷∞ÙìkÓd`ùß%Y#⁄gy41–&H3f‚ócÎ≥Ä‡±±#¥l∏AOs0z(™Éû≠UJòØCs&<Êˇ>˝íµ?©Yoö*´ƒnì˝≠MÚ3¯ªÒÙ˘·˙≥Ì≠ù√]ÌL¡òÖ\?=p•>}° ˝ì4¶~D√ëg¡˙≥‚Û<¨ô•iøÛﬂT…ñ˚d0{‚6)}c,µZµá-÷ÌieÔ˝ÓØˇkæ
+;Xe#K‚‹∏'K◊\˘c€?≈º˘º˙GïƒÓπ®.ò∫»è√ë©O}äﬁ^Z—Ãä›>∆ bUÍ–J¢¿Ü›ÄçPP>œ—ˆ˘Ûg˙vD:iÌcli›7CÙ#œ:¶ﬁ¥ì^Ó∞#&~y4	Õ±^ZF¢s`≠Cáóà£ÛÈ√ÍËXèUët;ÖL‚Ë*ƒ“m}∂B˛`
+ÊçËm3PŒâ,73ßáWK}•∂,∑ì7Ç(¢Ÿ¬ì÷HÖk§ªáÑ‰i–gußã⁄˝˜åqõy˝MÜ‹¨ââ±˚3¿ÓﬂÔcS®ø√pı∑√QàÈ’?§Uh<uä¬êœ`—å1{^ú±±Öâ˙Ÿ’◊æ;» î 5µUJ˘◊ãŸˆ∏±2ÑpGDëÎã¨2ÖXß4ïF˜©«jŸtÀﬁ–˜HâZ 7p°‰Ôà2≠÷
+t“ÒS€éNÆ¶™b˛€Ø5oãì¢ÂœôÌº!	ø~ñ˝∂|˝Ú6)6(W>h⁄-j;GÚO‹h÷£‚6çHOj3ÓµÌ/V`Dj+J‹à∏Lı…jé¸d`%Òz6(… ÏR˜krÍ◊ÜƒgäoÛIdΩùH€¢23ˆÙ‰Íf¿9nKSNÁªbX
+À˛6TJ”ê©=∏ ©nÜÅèZX∏w≥õº53ÕrB˙xÿ¬”˚’èœ∫C)_–@Ë≠	Í≠>:`F°üè‹0('©≈Ô?=|—C4º˙Ò_˙|tı5†&Ü.˝5„æÖIˆËõzºMû±áÿú\}e' Æ¨c◊cπq@i∂G®ˆ6´—;Ç1>rÒ≠S∑o%AÑÆp·q`ENÔÌÉá∞"›Œ€ 62]Ãa	”¬È±!À€€∆‘NpGÉÇÎä…3Î$Ê*cÆË÷î∞r|ö◊/S˚bˇ∞˝ƒà¬ïèâ§'m")? ⁄@®ry∏ÒÊZÏVD”s†˘÷s ÉR+c˝‹û⁄È©Àœe¢⁄‚…À˚¶∂?'0…ˆ‰ıW`efÒHô'!ª1ãÏ€`ãm·,%∂¥‘Û√⁄[û )DªûU!≠Vÿ.Cá˘9BG~"Y`πUTcF∫Ê,´°M’îzΩ˘å4ÉY«Àkdñ∂»º
+Q92˘8≠CZö<iê∑VË/ÇÂÙÊ»ÜÂπ'Æ≠Á<˛§ºÚC˛h|çmÛbÇº¢C>aNpm=<”™SoY¿x{†xNçR[ Õ”D±x%©AÁ≤B¢„˛4:bXÊÖ|F£ `w¶óDÓWEîıåi∫j|g›◊9ùÓy†<ı&î'déÌbOyS∑Äs¬b5– yú¨„Í[/qáa	‡ÍÎöä·ÂKƒ sÉõY%8báÉ√f;ù%tÙ|¨Ñ)äëß÷`)€π$…P≠7¨å\ÃD€8rxøgG∞©Ç#ÃΩ8Ò∞Ö¡ä≈Í…PöIcr«(r3 ‡å£N˙®Ma¨º˝∞–æ,5ç.“@|=ñC;˛âõ∫áÉŒãpÊC»√U≈o∫≈¥Ç¢≥Z®¡Ÿ°;ƒdYõ@Òz’'ì(¿Áõ÷y¸‘∫≠ù∂8K∫∞ôﬁ'ã˜·œÉ˘ÙP⁄y£@¶√∞
+dåàÓdµ∏¶Å˝ò/ ßgÚ.∞ÿﬁ≈'‘XGxõÖË√›˘ô^ü&8U„ıw»„’2‰¥Kcp⁄oA76Y±ZÖ)ågAØI‹@qÌ¿–iÊ[Y?“G6Î«È˚=bè¢h‹’ƒMãΩ¿Ù0ˇbàÔtªaﬁûÙ	{Æ√˘ì∏ÅΩ¬Ω#∂Ì∑–*ÿäÖŒ±Öµ^™wÖñ‰`äÛö-b}⁄è.6WjmFøô¬@‚¢joFœ¨d–c™nW˝ÿ˚dæ∑àÓêõ8CzX^Ú1»ÓqyèÃÎ3£fYj-Fs&¢ÂËùsû«ã<Æıµ‘;.ã&fQ«,Œ-Õ]Áu¢ñEf-a¸â089u4ﬁ®Ø)Ë\π®fY	˚ìcd”ÿVP ‡?+X„iGÓ^î9¿ÔP¸übjxdVä˚ªÅò?5zT≈n2L¯éø(≥·KTGRƒ,¿ä∂È>úBh=K≈&Ki]-n6π∆5ù¨eKHK8ªXÓ^®,u8ÛŒy¨®TXd9kK5U¶˚ˆÖ∑&Æ5dõüÔw;ø˝[qrıV+Íè"f¶£hÏX≠‡≥ﬂà„˜à3…!nä`ç¿´h_ŸW_¡G2äGÃøxEÄYµlh*¯"áHÒÙpºD‹'fìz4©z≈∞U4À3ÀØõÃÕÉlí£mÛcw.ÔÂ˜
+ÖƒS%…ê›EÊ∂x-¡e[)&ÏßHpÕqeáë≤#≈˚∑/¥Ã v^3^L+bÏ6≈åù_g–ÿ˝,hl˝Í[iY[ä∆íõ–d{◊=&¥Ï»B:F17$™¿ ≥`! æ@?›/>π4r¨w¡c:?5è-≠êß€¯|{s}ülÏ>€>ÿﬁ›Ÿ: ›É›ßªd}ÛŸˆŒåvôóf'∆ÉP¶•∂ﬁP@◊Ö˚@}òö2[GVóqË‰u·sk-∆∑¬Ma¸ê±_ˇÂø¸”/“‰‘Ë-πgı≠H
+?˝a=Ú“od»NúBùºxﬁ5ÙˆÚÂR¡aöO!Ê˛^´#¨fiyíhy©4àﬂô8“∆ëƒaê5dk}«Åá—e_\õÑ*Áì *x‰ïxπ§ëk∑ëS∑ﬂ~p∆“</)ﬁ+ú|6N&œ)jîâR2ê£¿Ãm‚Ÿê2ìx<ﬁ#¸¥>ítS(Æ±@ƒcXñ=zÜLµ{∆ƒn&=ÁπøÒî*™TÔXÉÅp˚˜
+Dg0-?«T§Öø©^°óöB~3∑%æªr}‰:ôJ”
+u∂lÌÎ\iKå‹“†µù °Zﬁı"∑K;µáæ◊}V≥ŸÁæ≈ëﬁ¿%ø¶⁄ß‰$ù3◊≤Sæí´,N‡ö_b7 Zûe∫w9#W ö9Rõ˛T+∂{_~π∞ôkDﬂéÅâ†`+ïv0º‘˜sª&/77£ }˜ç+˜ô∫¿UJs,çSÜO;Î∂y¶Ì¶Ï⁄u]ÁQî“õô.c/Y
+˚Ù‘[«80fvÓ…2rﬂ?Ñ¡∂KÂ…±ÍL¨6”8ïô‘…¥3òw≈®t˝GÃ≤z∑uÆ]ÄIgiµ,|S…∏›jø–Úa¨nÔVMQ8âÃ›“I„Ùb‚D;N˚fÖë∆ÇSfªæÓπ‰=]˜¨Öñ⁄;j≥i∏…ﬁÄìÏEï ˘∞V_ü∏äíÅÀ»ªãTΩ.çUÃ√∞«∏u8ÙdÑ…koLTucı6⁄X›tklåU]Cwà◊RQC)NÍ¶X?C˜LB?	auüé„—•]IbYÈ“5Q%	›:◊Q;b*Ä÷œ<ç˙O,˝Z%≥ Åaiâ∆ì¥ï §r∑&ìbï™¿ñí(x†euN∏¿ÜÓ_h˜GÈÈá(∆¿ΩŸ Éí$_[:˘§Û¬mÃ`[^É	ktä5¶ù(<-zPÎıX 1t÷íQuçù¸hÁÀΩa˙yQ,ˇi≤ÅM‰\xùecjzÅZgsß4EˆÚuíπV˙ùMßz‰cÊdwc§/ÛT¸7G“Ÿ¯Ã÷ †¢Ó≈’1ˆÅ¸ù$ÚxMPbú≠h∏∂FI“Òq›gÕv¿P[JL±:˝¯ÕAÛíJÏ»}_Î€8ßËáú”n„◊[ Ë¢THy ıÔÆ≥ö'£R ∏•]“t ◊)O™uï‡zır¶œ=+≤]À√Ûù1 Âå°vËS„¯áíÎUR_ëŸ§âÂzÃÿ{è˘ﬂ´öçX§bπ f…e_EsF&YË%œ=ê"©ÿb15XΩØ…BônsÕ√ƒçø¶–Ã9AêÉfˇ∆}/à1±ÊpÁâ˙]iTûaª¯±µy\ñYd¡5h’zÌ…Ûö#	th£VA!Ü‡√R›ôÖ≈Ü-WàXZT∆ègß<P: J¿à⁄/Ûzâ_
+n¥Zvjlh«ÑFJ◊Í´ﬂ‚©ﬂÓÍ≈¸˛Oe◊.á ey$ü4´)·ﬁE\t'l÷1+Úôã…J]?¶…Ï<˘ç8ı"õ¯äu.Å‘2åa√«Ø!‹Eòy±Òh˚&\˙Ö˚⁄–z3{Ü%W%¸9/⁄ífimÀ÷6NzSÖß'cº≠\∂.;Á}ëùÛæ»ŒY‚°f˚@¡Xs(Ê‹s¬<ó?MŒCÉóÕèçôcÓﬂpäFºÑ€iû∫∞≠ü±PŒVí5∏ﬂ:π…„≠ÇÍb(ï‚ÄYÀk6ãíËëΩu‡›88é(çÌ»=v#ñƒk∞Í‘#}≠>&Èe)˝Psf·ñ¿˛@[F˙zîj≥W¨fU∂QsÔg´ıWEr™?¥:QI!íe‹¶*Ñó∂©@Ô‚	4∆#∫`I3ükÍÛ:nXfqEÉùs9≥ıAdõ/∂v6∑6w˜∑»¡÷”≠ç√Ì›ù∆LÁY/5´Øg{–∑ià¿.]Ø¢J%èáxÃΩ—l∏π8[ø¡3AA÷¯¶fÂ n≠«RX.ô¿I´Rq9ö™„Ky	x!¥ŸIÈ„œX±∏˚SvíIı7<†…ˆbû:ÿDü”*˚RËU≈ó Vö‘<V<îçfíqmYmo[ö'ät<(¬Ëi}ˇÄ‹ΩHìi)Éäf™ÊVM∞ÈÇX[˘≠Ó˝§J…Ö`s'ùörC’q¿•¨9.Í<~ÜàD¿¸=≤étÌ"››êi:û^%-it„–'Óî™OùD9"5∂LÉ@U¬⁄Âó≤‚PZ∫ç±˙*’r1eÜÿ’◊Xu(ø¥˝5∑ë udHˆ\YTóMYnêÔÜLÓ–ÌÂû˝≠wíœø…'èGùíÏ#∏˛Îí~ˆ•¢?º¸”Ê •·Hu}≤Oé#∑R˙…á˜N˛)éÓì¶K¶¡¯Ôd ù«ÆA“z»–hf≤ÔÆ´5û7ïé\¥w€#lŒähõØ¬vay!∆
+í.•ñc;TÍÚ¢Iéc›/êÍú∫?%?°ım¯vl˘∂πVO+˝÷V7˛Q<ó‡R_Ît4¬ãﬂNºﬂ∞¬dY‚p1sOÉ„îÁ6L–}¢‚“¨©YË3.Œ¥N\OìvZ∂M√dµ„≠>ù{_Ô•±cyûY%Ÿ&≈ÔÒZÔÂ¸ß&u9-ì»¥ÉÂ∞˙X/·	4±œnË◊@ ¢â^‡{|`ŸèÃ≥ßfK∏m#¸ª¢iÿå#/!@Çc&VÓ“x¯œzºi%÷Û˝ß™∫mËâö·í5	U*áv}VÜ∫ë‚'!®œo“ªrŸQ¸.»®x;S;K.óÚ'˘z≤ßÛ|–¸Ä∏¯lFÆã∑nóBÍ4†¢%◊Ê)#“¯ÇVâU¨¡`viQf9YûúÅÎ ÚÚÆÊ*≤≠æ:’a•©π√æˆfà#{UH}A⁄ÚÄäæ`µ˛0<ŸE&‚±≤Çãò9$∂aΩô»˛Ïcp¸öh`ÿrµ”ËÍ[])9œ·/Èœ≤Í ¢ àùŒx∫L}°Vƒ¡àÚPIRπG‚chÅŒ0CßÏ&Y	øb.\ö„’wL3'Î.üëw·[¢Ö∏|å@†ÿ§u⁄Øç≈c%AØ≈W=ÊYÎÔ§ïøŸ0ë9∆Q6¥Î£≠^°ô.oùîönàÒ»™ªM∆¿$+>˜m#±ñdˆ‰ó÷C'Aƒrˇ£TMÇì¬ÿısÎÃrëÇˇ¿íAà§˙Ú¨4—{cº≈Còº)Âì0yçgB0y#√5yâeÊDpöºtj˙BdˆBÂå~åWsªßÈÀÃ:d˙íL‡5_ùb“8ÕÕ8µDvo-_ªâÙ≠Mn:Ïœ‰r◊X¥ANçëiHg≠è¥<–¯s}4€ˇòz!»%OFæçÚ5˜≠≈ö {ã[ÍX·I£jÚÛÔ∂Ò^ë?÷°ÊÂL˝y$[D#í†u8© –g%≠*ö~¬  õ˙ÊèÜ&áá¶È÷ñDCŸÒNV∂ˆΩ˜ö7£Gí∞Ó^}ˇÂﬂ¸3yc˜Ÿﬁ˛Ó«Î;á[ds+-t∞±}ı´¸û◊;xˇè˝WÕmcª∞Üˇ¸ëÁº∏œ
+π{!∆ÿı~v≤öµÔÌÃ≠øwŸ⁄.N¥‘∆~‡ÕH˝˝ÍO	‹QÙwÕ⁄g≈T∑“™íRBû‡OrÚ≥ÌΩ§m˝±ˇ›_˝	¿˝Èˆ¿¸  ¸Ò˛˙ÊÓô#€;O˙ª+Ì¿ñÌPµx#8∆íÈÒöî¡∞]Z´k•;tÀ≤›.⁄m∆NfòŒ˚.¶($êÖÀñ˝É&À…¡HW‹ósyÕ ƒ≈mÊDd≥Ï‘kÍXV∏Ò2ƒçøk.„˜_˛ÚÔ…˚áªáÎO…˙«ª;∞à+Ô„`SÄ
+!çA≥:\V®WoÃ™µŒbtW[B√_ˇ÷xokgì·"asQÃ!Îk¢Y4√U–/^S+óçEWµÚfN=Î√[¯U*Ó¢é¸"‹˘Ú£˘”¡ßπ-¯º-g:õ“8aaÌ§Cú2+÷ñ8·›.=$Ø?è<=Q∑Úf2éÚD{‘Ïmjk7¨wõ¢‡H5î' ^W%e(‰2Nw±\ÁπüÇ}®Q∑x^≠aıdõ|vΩ{‚≤å%géV]A«AM@(9Ò•^@µ˘?ı
+'Èúë_ú™v„ZUúÏôì¸ÙEßmN+ŒpÇâqOM&∏>¬xpø_ì·®∂Rmh†ió‘”πÑµg=÷ıR‰c¸Ì?ö=œ™ù^◊¨∂Dùm£ôhÑ‘Îó oÖ(âÎÄÚS7Yu¿%BèÖMhø´:Õ≤Ÿ÷¥%iÕ€[Ôçg{≥ÛÛÛõ`
+•¢Lﬁ”u¶/V‘ö≠≤up∏^‘,€<ˆkΩıâaú	ì1B[ß·ﬁˇh∞‹‚-±Õ8lÓŸ4n:1.·˛'iñòl„y‡k\àYÖ¥Ë"®IÊÀ„∆ÎVOïZÉÂ¥Ê|àZYÁö#™5[IWc” ÇQÁ∏tló¬≤á π.∑÷E“C=VÔA3Ü|πÆ∆Q˝\+"ó20fYvK◊Æ{†Y£óTãk,‚∆{Mß:GsC∫µWöZ)‰≥Àãà∞]2’∂πìøÿwSm˘ ∂@ˆ±Ú∏Xu´-k‘&…«:açM¨#ZM÷?ÉºÄ ÷´FAV‹D6ÃÅ=≥¬%ÕeKjùñt·ñˆÁT1 (zŒ4)± ƒi‘BÖGÚ¥Â∞œºäê D∆¬X„‘Õ•ÃŸÛ*8k8à<Æö~ß◊uƒUPÑVLány±k5£ÂJç⁄"áÃ&fÍ¯LRåÇ6C˝ñçmå›#◊9ä◊aµMHl6»÷D„l˘x˛qdÇ∑(y˚†Ô™¿®@êHkmÇV∫BFs÷ƒÏ1¯ü§òMqπîMÒ~C2EëC;ÀRò’˛¶qHÌ´ØO\D+v˚¨8¨	ı·ßµà≠i	•õ“ÊèÈ:OåeŸ!{ÎüÏí¸ò>ØÔolØ?Öüíg€œv…ÛÉÁÎ˚€ª≠Üë6!P},®3p√&óÎ ©`lv·Ù´»Û|ÀS5Ωd∆~ÚöŸ_0ö µ]?±<Fcû#≈ÓHN…l¿Øgâ—∑≈4BJ Ÿ<∏∂Ÿfãi8y÷M˝Æo∑ö$ÒI∫78< &ä<≠˜ãLû*úß;®f◊,ÿ8%ªMçÂ&Àf>∑¨„R’Ä”û4∞ÕÜS ô^⁄ÆÊπœôÎîl;”≤Ó\Ø}G£ıüY„òw¥<R„ë∂∏a`Â—±Û‰È˝e;Oéﬁ&5UT∞˘3»‰ª}©lî…˜¸‚¥å2ÔÏ1uÉxgè—ºﬁ{å
+z	å≥Ωı¶ó‹¯4q≤4˚V√¬-1hóñ“”sµ5]≥0Œ¶G⁄ ∑†2\r-ﬂ~∂˛…÷9ÿﬁ1VsüG->¯b‹uébY≤£È+±Íº”Mn_E´ã±˙Å˝ÍâîŒ‰∞ê∫fé|b¡ç‰ÍkÕúœF~“û´G[G*g∏%…ÑÎ*ª~ÍÕ$,Å@#ı61À ;Ì9¬ªÇØM†R^IrÒ!õkmÊ Ì≤¸“H pì§„„›Cå9({Î˚á€˚‰gd}c<˜°<¬úÖïùEV®È•ß<Fú9
+JxOSlPW©hE›˘÷©€∑íÄE¬Ü«Å9Ω≥∂k˚÷j&	¨8È≈#€¶q‹ÌÏ”x4Ñ=ûÜp± 	°ãˇÇ‡QbÖVHAOÈÈ8\kÑ™€´£+ a©Œì?¨ÊÏ,˚`©lo‚B‘`[ù≠r∆a9lôºé_Ø˛îl‡`™O∂4≠ªTÀÒ˙≠GxÕ	ŒzX˛≠˚jê$aº27wfıÜtn{^Ω{L3pËÛ˝m§—ÅK√∑≈Â´{§sÃ€}8,ƒf∏ôﬁÃ∞Ûö1QJÜ">I√B’~
+ò˙ÀøcÏVî∏¨B∆OVØá·[Ä∞ìD£Lè2iDä)r
+q"ÆúÒÍh·õŸÂ
+Ωù8ªÜ/§ï¨0|rƒ‹Ç}‡;nk˝eΩxÏkµ∆´aÕ1∞πÊ«µ≥∂7≈Û gK£·°’“-ËûÙ»¡÷FV|¯¸pw{˝)àx?#˚[{œ—G¸ÄÏ_˝«ΩÌM¯Pî.ÏQÍMÚå˙#Êu—I 1#´)u@3,Ù_è=7Gvè‰3dêÍJ&áÚ“jOòO€ %ÚçÆæä>πvYÖ]¨SÍl˚–úõ`j`d⁄`lVüˆ˙4Ÿ≤€}Øø‰±éé‹¸È˜*´(Æ¿É≈F+˝¨ë?8ÿ›È¡®c⁄-ˇäÆ’@Iﬁ∏o“»æ∫»~¿r5vÌÅÎ9+"·=ÑÄ:˝>≥:<ZÆíN≤(t÷∫Gﬂ·/g·Ëå>Vë£–≈í¬ ÿ€=Ëm(¬Œh¥™≤*q#üEoÒû4_√Qf˛Ñ:#<uÅƒPG$î<†…#í«™Ä4≥N∞ÓΩxø7∞‚Ù˛å:@7}“rúÏI’Á≥—»PÁﬂ—s⁄.”˙zØÈ9÷¥-`ŒLÔ‰üÓk\∏◊J@1X4u»V7ÔoÜG‘z]?4æ(±J√yô∑£L ˙ –ÏãÕ&C|Q%xáÖF
+àëD#^	o•w´Vig¬’mW—ñ0@ç›·•√æ√ñ•øa‰Oß“êΩ'ÇÆ≈¥ı≠OB›XTƒ;v=◊±ñÄCx$(«2<Áù,yïm3N≤úU]∏—î∑AÌ∆ÎŒ–ıK ÆŸ·6¶.ˆÇ(]_Ï°«Ô°gõÌå’@H±‡±¨Mº≥÷£xØπ¡Jã V¯- +d 9¢WˇPï’)Mp¨8é6x§=-Æê=ærú[Å‘î˚heål‡~¶!˛:ûÖt;€ar⁄KPz/hÙcx1Ó‘–ß|MÄ≥!22Ï˜©«jÎr2£î-∫£+Fi _)* K%í‘ì1:±M‰±Æ…ﬂzëäÏ õƒ˝Rmè#këOv•ÊÔï∑e‘H)©“Öi,]ˇ%≈˙«Åﬂ"P˝a;wcó¯Ïrﬁ0(¿ohqàGUëP'ˆxÀuX!f◊ä·*‚®ö&4à|Ï,∏té$0 ≤X√úπÖÄ≈:cÖq bŒœz"WT_Ÿp2–$ÅBòoXèÀÍ.O”ˆY≤≠ú¯eÑPó˙•¶éhoßíÎk˜n7ÇÿjÊ6“¬¢≤`0" Osè0l§ú #|ÖAd)yá?ˇy]k∏‘>Ëç6cSÿZ§”J•â
+¨k	ËeŸòÊÇ/9∑{í §¸0GªÚbøúˇî!¢X2Ò.êYTºïÿRËdµÙf-ìèa á÷√BbL˛<ΩÅÂ
+ÎØıŒ–FbÖ·Qí=`™ÒQ_y-∑ˆ≤1’nvAË√0O©Ú@GïJ/qè¬cﬂ˘gG>ŒûÕ`‡ΩÍ=á√Q_á∑Aãã≠œx∫/ÜÅ∞eÛéqHS¶¢y∏´=◊ça3V‘gzõg 	9bà≤#â õ=∞¢ûr»¿Ô|-VÿÓQ=Z@>aœt9á]kÀ…≈µ ˆl∂;’Ã•d¯,≠}OÇ¨ÒÊ÷ìıÁOè~Ú„ı√ÉıΩΩ£√≠g{O◊∑§’Ω§“&≥§¶ÌgVˇ{BtPÚS[™¬©Ö‰•;ä¨F7"”wø˛
+cﬂπ@∫Œ©˝˛’W!$k`∑√÷Ω˙ìÃ!RY∏ï—++‚ºƒu(ûK ä‰^Ìo‡iw_–õ6Â‹‘ß0 TX √‚‚8Üo1Ç©ñß’TØ‹2§ÉÖ"47hA6ÊzΩ/=œNd£´oﬁ∏√ ≈⁄ÓG©nGM…¨°€gû∂«ƒ`"B=E≤ˆ’≤Gàsq	ÕÔÓ)<Ë·K~p*
+•G˚≠∑À‰ıh¡.˘—[ÜU˝ëk•LÁHH†-åÒWø!õ)õ¢d`dybYa˝ÅAíÓ'º°s}>{˜THˇvvà¬ÿÂ»Ú +Ä¸±Íê¿Ÿë¨œjœSÀ≈E H£ÖDÈŸR=tcÊãi·[#)°ﬂÇL wnV)Í&ÒQhıõi’˜_˛Ú¿ 6¬ÉòÔ»9∞ú\t≥ÇÕF¬«Gp^F™xeÂîàπ«.~ÈsŒú(VÊ>‡Çn˙~FGQ<Ôø]8$√∫u‰Go∆ƒCÿÍG…)"t˘˘ñ—úh$Tb"àMz∆qÄM#1$%œµ%⁄ì∂Â¿‘[ˆ’7¿9]NÍ"ÀÒq—˝ˆP<F¨˜ÿª}"É∂A‰GoÇú P˚40‰/~C>°s†SbOlm◊á÷@û@É‰ [$sd›w¢¿uÙ∞Ü∑çJˇ(ë!@‹q„0¿É‹SNd s)S~‘n_»‚E€4/E¿J∂9ör¯ÕaSaZ–©ÏM‡SÈŒßÛA≠·Ë⁄3ñ.•	Já+·Ï√,9È…#≈Ú]Ù5õ=±:Î™cAï•YMæ°≥¬>G¡~.8ƒ¿˜R∞iMÚ°á·„ŸeÊIsø∆©Q√°˛£¡R≈âÿÎ∑:?T9™’Á±ñﬂîÔâáß˘Krò∞3i#GËUÕ‹jCmtåñúõñÁ1ö±öéBU‚ô˘•xhî2J?äÿ˛œ,díJKíÑGsÉ•⁄ﬂ™yÛDR©o
+÷Äl ÏAF¥»˛ÛÆæˆ©%S5Lº(J˝´oÖûË~¡$z«‚ÑôÀ≤º”• Ñà±r%1Â%]π≠¸àg£ƒ≈˚LƒÀ}%R+:äl\@Ì’B•&=`≠ÀH}myoˆ#‡(¯˜f<ª@º˛äÙuëaÌ√êÚËÇßœüÌ¨ìÌ?˙√Á€[˚õÎ+‰`Î)˙òÏÓ¨Ôß¯µÆ¬ÂÒ@˜–Û,"…Ï˝<=rÌö÷ÜÀ7m/ì¬¶R§ÃX—èP"O3T';L$´b[‘∫¢ÇÕ)Ø˘aG√Íº»°<ªÑaDA8ª0∑Hfô„«9ªQäZkÏA‰%æﬂ‰◊ËØQ´ï◊À√Q5è•Píòß∞ΩGƒ˘(lﬂÙ8ÑìN.zΩñjƒ¢ﬁrıÄ©Ÿ˝OUp˘∞“ÜY›eEIdo»|a~Îí+a5˜ü
+^Ù˚Sî<Fè Ïüíº!›{ò…&¸≠⁄»ªáäÿCÙIîLﬂ0©—øØ9ACà”¬"_∑<ß;±Dxb“Ω(ùØâ%óı9såÈQ
+ƒ√cJiÏï‚ÈB´xä	Ûs˙…ÿ-ßp»$Â∂5†“JÍW~ïÖà7ûPØ‘U0≠:≈~ÚsÕµ¸–ó9md_€<ëµÍ3‡•_ïèE¨Á#–,0_*NzX8•ÌJ_c'ΩdÖÿZ1õ9^º*g⁄ gIQ%|°Ï≠ØôÓﬂ’´√óOGÎqìFœı∑ ˙~ò£Ø∏…C˝”m‰a5˛Q¸˛@Ø2^xË\iÜÅÑª◊È¥s˘™}q¥M3â2&…™Iıe˜÷D–#ﬂÜEÿﬂK–FÅ È'ïP;§Ç·ãÌΩ÷å·b&i‘≥Ë~Q úêÉ¬>1ºŒnqVT¬º~ﬂê\òÃVª‡Æ9¶MîèûuôÍˆçx ˚€∏~*pvå2R@;,ë˝ë| ©]ûº5®„éÜr‰`Ö∫.≤l˙äÒÂ	ˆÒ	”ƒ &–—ÃeßÖ1∫u €J[5%'lOIX	´ù}–îPP7ø¯N¿]˝b°Ëƒ≤+2ÛÃ∞–Ad¡c+ã_}√éUg∫n§©_#!Ω·ßVª≈Ê÷˛÷∆è◊W4¬_§∆¨í›¥‰ˇ¥&9FöÜ˘r%TrKñc¡0µÂÚÇD±\'Q∞2Hí‘]î◊≈≥eÅ=o¢„›HQô≠V3öä^ÉË6t}‰@ã:®æºHΩ˛ïãS#7ßöù∞Bâ—V2ªX¥º K8ü‰√ëáVV= XµF…¯‘≤ó€jï+qb4¨—iïñÛ‘Bé÷‹y®v”Ñ¢U{=¢F;tY®‚ò•9è¨Vg]¡ûTÎ<˛˝‚ú3A*+«C~Kkù“¨±«≈7Bh˘ˆm˛ÜÈ™ˇ   ˇˇÏ}oo‹FöÁ˚˝ÂﬁÏ¶Â±ZRKrlmd£#uúûë%ç$;ôı2’§%z∫õí≠?÷Ë∞˚ÚÄ[‹Õf±,òÛ·ˆpyë{ÛÓp¿—7ôO0·ûÁ©"Y$´ä≈n……dLÃƒEã≈ß™ûøø_˛œUïñïäñD˛›…ë¶{Â$Ù^ÅπòØNˇ@˘ƒVËë™πÀÕÖ„{ò)mc˙pø›zRÕ^y}Ë÷£ ´Êa|Ft–C/¨æShD.:ÌíÑûet.YT¿ßë©“¯≈“Rﬁp–¿ã(",ºÂ’?h†µ∏ÙÂÏµ√?ı¢»9ˆˆøÇY‰%^ÊÂJˆ;∫óÕŒQËái)º-wåS	≥bº ∆≤ØÑ*–kPf‹{KEÙVGe…¯G´9Ù¢›≤ä∆,5≥— ˛|‚√¥„%≈ª˛óäEÆZªüâù€®ŸÉ¶WL2;ıaG¿¯!?ì‰ﬁ’S˜R`¯Ö’:¨à˘öïΩ‹•e∏ÿUÇ§∞UﬂÙD~f<ŸLN¶’≠≥˚ﬂ⁄Ãk~ıÛd¯Gú„¶{œí∫™€¨⁄@UZÈR¡…†öQ8=+ÇﬁxÃ¯>q∞@5¶,ÈH´ÍDËî¨8ì‡P~ü.?cLN4Ê≈Øí◊Bé•ë…™4®yjÅØ–.‹¬ŒSÜ'Ï“±?¿∑’„\È‚@˙Ä5<≈ö©>-4:ÚÑ≠ääí¬7„ßo∆Ù¥;q+üêÖäqŒΩ≥æÆ*®íU	nv$Âp˘^Û∞GlÒ∏òˇrÃ!,›jeÈaMπø>À ~¿JıÄ¢qÀwk∏‹
+°tﬂ/’©fW†»+‚y}/LJª∆…®Ñz√£ÏóZ…≈ﬂT‰rR¸¢ò‚•è∫ﬁ …rÔkc≥ﬂàâ#µg`PT\Y∫êπM∆YÒ ißTU{á¨«Åhª∞’Uk3⁄‰]89'IöŸVÂ»µx)£§Û.Á∫®ö¬aˇûµ0©≠±l-##&GY¡ÁaÈ›H¯¸R™≤m∑+iÉ˘e7˜©3W	)3àÖ“ﬁuIK⁄≠µtRß¨£ÌxLÅú∆0±ã ƒâ—sõ∏πYa†Ò#W0=‘(ïûæóîpù>Úˆ¯Ksn7]√@É˝;xE9aè˛˙/EŸªm/-‹ƒpŸ˙cÿ≠ÿÂyTM™˚Õ⁄Â…aΩŸÌ¢0Hº6KV^q+ß:ßYW+ nãe»“é8∏'Z<G|æˇ¿Êv?_	∆lf9YÌViËé∆woS”8©ò0¥C‡˙õs?Óÿ&¢TO≥„]Ã?IcHßï}){CmÁœ>P~Xœê÷ãÈ'óıÈ&îÕ’|>%’≥˛ë8^¿ Ñ¸ <·Á∑ùkó˘$πaÇÙM™√…1cÿ¿ +OH´¯Br‘ç3$«ÙÒÜ‰òaûMw∏ıôf?◊t—á:”.›…Fß∏…|ﬁ©g T"í„fÛaÏ»⁄h≤Oºp á^Ë€ˆY⁄ 3?u˛køt⁄MØ®Sf-©ë∂Ù≤”xÕ-Xïvö¿˜9¥_«“≤Ø¨u◊°kQU1®˘Ze˘#Œ"ò[ãuÓQBpaQzËVÎzËn∫D¢êF`ˆÔ<«≈€QNŒwERSaøxäa∫h¢y¿ÁlJ<ë<ÇŒWìÎo+ãa‰£ŒRXòi)Ë›` bJíÕ∑…´YúÅ÷D*q\J?ﬂ–≠˜˝k˘ÅT3,)¿`}'’°Cj¯â¨]:ˆ∂Ë*RÈ:«—¬ë„ÉO®&ºéìGnú–GºÎ°zX+j”ñ—îZ1’∏ﬁJUMÒ¿∏"˚ÃyÉ·¥~Çy!:Ç≤A‚16öMk∑‰4_ßt+ıFƒ†å\gºú°.ª∆óÇ∞ÆqèQıú‚%vâ/¥°BW∞kZ‘Ë…mãÙ©EŒûDe‰»Ìnà≥◊ˇÓÃ–6H√©Ô°‹Úæ8«ûÌmÕ–Ùpyr8	rÀªÁ√∞sù°eD¸Kq|‰ˆ∑
+0X£mÜáîr√Â…@`”?bƒN^cdÂ˙£Múúr√üwÿ>áqö°aÃ¬vù‚'=†≥ÏsÔ®°Äï–_Ú ,,CÇ_ìçèzæ´‰†ò©xhﬂ¨…gR¬Àü]Gã¡cjZrh¥÷1ò.ÿ ˝˚&ø^Ô9?¨ΩW…QHﬂ‚*À»E<8û Eúuv$<‘ª~UÑ/”¨3u†Ò(/®ıŸ`ı˝…îå· ã•jöf˙Tö‚Ws”<∑û”ç∂ƒóº˝[’.io∏9`®ˆé>Î8#‚9ı§Z©_≠£‘◊_!òÃÓ¿€wNΩdπ°à‹=¶∞jŸ 53Å9(¿T~Ô˙Y¿ˆÀC·˛x„ƒ_8‡⁄µpâÓ	(íÆ√≠≠Ñ◊ûï3ãPΩ=N∂§±2∑C˚dç *µ∂¬ií€€ﬂÀ>i;%ni"|1€$ÿ@≤òAΩ›]SˆÎ§§ÿ^Z]Cô69FP<}Ut)„E˜Õi1‰˛hí€cÈæ£Ë∑ƒéôÇ∑p∆Íbﬁ);≠su‰ îu™NhAÄmá∏1™[”btU¡‚¶M˝≠¨=µ˛É=ùõÚé,°U™ß;õù-÷{∫ª◊›Ô=«W?>Ôu?Oh|%2›Œì8∑Õ˛vgÁ)Î¡Ÿ≠ﬁÏ˙¸y£≥˜§√∂;ÿ–ÓˆI5KàòeNÂ\àµêY+œ1≈dÒ<9gI_x?√ønå·Ã$D7ÏõyﬁiTÒ≥p)a¢ úwΩWŒdó‡
+•˜œåÍQz?’	˛m;ÔUPJ[õ¸ÅKi«˘º·ƒ9Ωjπ!‚•· ¨Ê9:¸ ‚I4IóIåI∆¿Fæä=lüûßŸÚXè◊ä‚`åt5Œ±Éª[~ˆ‰%ºên<»™]\ÖP©AùU, "óŸHë¨ÛG´ÛïÆ∫L	12ÔfŒ√i‘IA,6‡Õ'§Úú—ã√¸1´Rπ0Ù√T-¸\˛=Ëœ¿?V¶Ø™f≠íG±?E˜ºnwÍL»6DP€Œ©3B®E‚ 
+&˝Eï"aTπ»Í‘nΩœ5¬bπ≤VÊj*‰√≈EÉm§ô€e—B˘∑^¬“Àç?Jöz˘[mx!dñjÌ‘z° e@˘¥N»´N∞9r ;[¿<€Í‹eE"]®\¶S
+©Æ»—Ï.‹«5∂-MÆr±\¶z¡ÚRé¯Oüv¨7´‹§Vfb˛„ﬂyì˛¨—ç8=≤!Ë¥l©≠vıòp∞ˇÅ·£Â5FÄ⁄ªAã=ãåôç'8:F–v7X@a4bóÅ√Îﬂü˙C£T‘ÂEÒı€ëÎÑ	ÂëCºeŒ$tt,›Qi∞ ®cô·)OvπÑ£'¨7bkÑn¨rº9úm´y3µäÁxr!‰iZ\côÆÇ2Ø†ññ÷I’L˘hUŸ∏*€ÕjL°nPÆÙõ€e6X8,õ^ƒ%.$Q$F¬é|BE¿¨MæÂ© SÔŸé8±HéÊ£8©õí^Æä≈¨¡¿05˛Çz˝àx0õ£∆,Ä7
+/¥é'Å^8<ƒΩΩ°s¨aÄ≈.lı√ ävBˇÿ¡Mgå.Ü¡$“PﬂõÇæ7“àV¯¡D—Ç3:uêéÕ˙´õiÏu˛÷lL,~E¥∏¯¬N–œïwúxò¥"n·øÓ·›çœ‡ûﬂüTB¢á≠Ìö∫HîßÒπéS<!>oπ°s∆øÙÈ[Ñˇ≠e‰±¬7<¶{D[EFi„%@˘≤`1g_3ä˝æâŸ]	èéüÖÉÏ•„`”âùg{[ÕÜè]ÄÃÓE1E0D≠ˇÃéπºªÎ`"\/˚ôu¶Î8%?8¸‡!ÃZ£‡ÃùÙÓee√ò5å‹≠Ù™¶´”ﬁÓEÀÅ›b‰n Ow€©~ÃG˘ï~“ïzCX≈-¡ó◊èêª¥)ØI∑EDIèÃn:Œ‰Ù›[ŸÀÄbïàõ‡WJjLwìõ
+ÿÇMse¶W6®®“nleÏx‚";“8oôX≠\Oûn∫E∫˙=5—÷eÒıï∫o±¿N5F∞†lJ|í,‡\J˛#â⁄h*ñ…Y&ªq™'˝©5ÀÂ9^vìÈÔõz∂€Õı©gz~¬66≥…«IÕ»}#çZK?‹FQã¬~ç√l…∏¬ö ü˙çn
+°î'm£K¬èºïa–GVS¨ãOñÌã™fZÖ—–®o3ÃÆ}[õe}U´ê#∏Èø	Â;ù€!.€5∫x^ïH†¨–∑MÛ\µ`m(ÿdúˆhØè?M∂¡˜õøGˆ ˝ÿAk“eËg)	
+ìŒŸ¡·-|IƒasL€SxDÁóJQ¶qHµÏâ'sô¿OÊ_¨,¢;∑8ówrCPﬁ≥†∑K-ˆº∑–a›˝ÉÎøﬂﬁDñèùßª[]8’D[¥ôÊT(EZ≤MB™Õ(≥X«“D1yb*£©G¸ö˝‚:!XØ4À¨bÎäËànÛ-ÉÊØÆ¬ßag¸˚GØA¸Ê15’Å±ïñb‡ä©¥@g°;ÉxΩ!|§ƒà¸{©D}ó2T¨èh©Êdñ)x–Vmæÿ¬}]Óç%Ió˙ØçtR∆ˆwˇÒsÑ8Ú"∞O\¶Ktv#J‚DÜEJOç∞ó`ù:—cMÉª–·+yQ|Ÿ`Z∞IµÁ"	pˇì}b=5µÈÑ°§A‚’ (‘äG*cÍ∞¥ìı`≥[#6≈˙	ΩNPkaPMq¯ﬁßª;{ùßH/¥√6∫[œ∂`!Z ﬂùÌ˝ﬁÛ.{z˝ıÛﬁk\øÖG»Rÿ¸òÌÉ~ËçÊ4ôf•eÎêõ,âî%k©ÅaL¬∂Tå‡Âp‘ :@;QJyóFZöt"fû&Êdò_ˇ;{¿Ùîº©k∏oqïá;úwéú◊Çw÷Gb√ôåuÂe\5Ç®O‘sSa…◊|[8ÂaÖºØ‹ºíÂ„πÅ»Edáö[‰X∆®©¿[]¸+¸∑;6œPK¡ö¶!àÜñêˆ0v∆¢ÿ_ÇN^4ﬂ<€™ ã^ñéò:d´≥˛h§ƒŒÔf&ˆ]MUâC‘@U˘DÛﬁ)íñöûÈü ?«û_€üêÍHQªW‘ø˛˝ÿÔ;¢2€B'ˇ9πˆÕY†⁄ó9õ Ú†ÕÕ8X«	π˜£ôﬁ¨‹}=Q∆`ì«bÿµ
+.∑.ûÆÙ˙Kmú!KÇﬂ/}◊e´ÁÍö=¡fœ¶n∂∏€À˘ñ“ræúæ@Õ?8tÀUôæüF‘uâÈ‚XÒm˘≤•_Ê¯ó™‡_¨Hâ∆…±9!™^7°¶'7ÁH¨I.Õé#\À‚≠}F"˛£n∑p;Õ8e
++5ïV<‘‚G“~¬ˇ)ËÆbiëWSÍc_ºıKsb+Y©ËpF~f¨o∂[m5∑‚&kXc/?∏ÃçdÎ¸ÍØXÒ‹≈’_Ω¥h◊ºÈCÊ—Xl-ÆFÃÉ/9Lbcç	±§‘oz1XÂ^≤c%¢”w∆Ò$tÙ√™M5*%ñ¡~»eπ ¸—+±µˆ∏∏¶1’ò´[Uª•ﬁ£gΩãñÁ∂v≠¥E‚Ö†N?¥1Ø0dwÄ2≤∂Cú¶AU{b¬[g^ûäÏJº˛ˇ	æ$ŒA™ê‹ÉÎÃﬁ{äù†È'/z±¯eı]Ál›(ŒÕ&µ÷‚±_ÄöÑ˝n!ú¬h⁄Ùæ‡S≥•≈≈Í'^‘z‚/í'∆¡8} õY<A≤Â˘€4/$Ák ‡ÒIlÊ‚=Ò≥?j¬SÓ±Ûπ9ÛÃø0›}aæ€òÄ™_ÑË=I/yÔ%ÔùIûA◊πM£Æf¡∞“˝¯TAy)«‰œ∂IÎ»πÃÜÚñg‹Tç
+^&Vüú∏ß~‰–†
+bGX§∞mìE‰ç$Â/›^ç:ùºX≠†›á1ºØ2è
+6È Íjñ9 ΩÌÔπö∏:U˚t@\‘:\ïæå˜UÈyÜ5πéme2ìt›J€™ º®¥º⁄ú‹Ÿ b“Æ2UÑ]—d≥öFi◊yñxÏ‹îò≥LöA_‡ŒòòjÕÛSmÿ9"üÓ<€Ô"»’ÎÓoÏıvˆz;¨âV§üBã
+Ò√«Hßº3`ëÖU'òDû≠sRË∑Cwçª)´–é*)’ØÕ“øHÆ…•B¨¡9I∑œÓõ¸Á√hπ'w7÷@D"ˆÛ·÷rëÊCâ»"Ÿp¢ØRÁü${õ;÷Öªi*geuDßû◊Ìñ‘†ô…ÄAè–jπ~#;Ç—S:KeÚfU…T%%Ãªï/U¯§ˆfQË@ù£¡…‘9v™ïA{“Ï⁄E…§7’÷ölu&Y<§XÍ∂`Ó$§"û˘èV3ØÖæü’;µ W≥lˆ’®<5C˘cOM˛úy7Ïﬂ9◊
+8!ïWâÓ’ı _%àÆ§‰˜\Œ™‡>í(πJâ %èßeqë∂fL°çÈwg\.◊|≥Û$¨G)ê#7–m«∑^#YHâ–‰WÏ˙§hóÿìÃyjò-¸P√8·∑Ê	VßWçûhûH≥¿ ÛêÂ{`‡ …éZ≈·∑|q<©ïbßÀ≠%’µ•°,ú0óŒœœãS¯owo;˙>Ènw˜‡¸ngØ#WôÓÛ™”ÌO{OûÌu6z◊_o≥_∞ŒñînÙv∂·lT*,≈ê˘1∏TR™/$}”„·√/ôºÁ*ãJÛÂçÊ¬RQS˘†TI*è_Æî15ÌÚÇVVˇiQÊÂô+I—•Q¶∞¶HŒÈ¬x]Ar¶≠0*‡ëwÙÅÌ#Îâmã¨öBBCy>?uŒ˝!<¶ù¿‹W¿®ãˆ‘Ñí\¨z≠$û%s_ìXÚ•f[p9'UôeaW
+©y.÷?"ŸJqrD,…≤ˇM_t%J-NõûYÊß©ÀY*KUDEŸ>mÛK
+MI\êLtuabi´.äËRÆö2¡sEC&Má‰g⁄πl»jÈÕ◊\	›Zlói
+›
+‚8ÂzX‰Ñ„AI∫U…èÂ/ÄkÀıﬂáûìRZOZ M˚˙Ì√ËÊG$÷XxƒØ©MB	irqy^ØH«>ÁKXÉâ!#«U ãó˛{õu‘%xL¢§VıO—ÍÆí∆˙ík¨–ˆDb}5WR2ÚZíï¢O
+æºÁï’SRKq∂¿n'-@eç¥úK¯f àè≠≤‰|¬ @ÂO5ƒ√JÇ≠÷/
+Rùñ¯fãõ∆ÎYîd–¡VJ+ùéõ€˛Q∑æè∫ırŒWoì+ ÷f=Ã≠~ÑHßSG˝“=!8œ[´e86◊è1÷]œÑç}ºŒñj¨Ü|«ŒFAd$Ø≈◊$ßyzN,~£ ∆µ08ÛT,úÊıSø`¬Cû±ı∆ûÁN˙æ(∏4œ"ºd¶πVo–TgñaÚ`?©∫PP’	ﬁ`$7V9s:˝T≠8¯SÿˆÆŒ˝‚ ¯î?jÆﬁK0)≠Í—:[˝1Tá˝kâÍçÍTIßüStE.ÃH}¯3~ı%´Øä|¶u¢ú`j˚a´`@sÍµ›∑*~á=ﬁÿsBÕÿÀÁlVn¨Ç	∫Ω√3î˜∫üu˛v<Ëm¸¨{ õû°áõ£èﬁP◊ÏåA—ö¬ µ¿+*n_´+ñ"ì¡i4&Ω˛¶©GQŸÉ`c8	2‹óïOÖ Z˚¯dπLµyl‡∂|òC]”)Ò:Ùå?¸Î«B]V˛+≤íûTó⁄«Ê˜ø) >^8Y.ıZO_ùcCTë1Û0q,'O∆£G∑†gÑáÙ«Cò8·ı[åEË˛)ÎxAz«>ïáÚ L‰Tˆ8kÃÄBJ>,π7πí2KÕ¯#–&}'ä%SQπ|È*y û∑5◊mË√à8¢:8~Ò	Ühﬁ7Œ·Öy∞∞ÙR‘çRÁ¥<)Ç%]ˆ¿∏P±U™¯NˆÚ7Usù‰â7^Ø±nÆúí9ÓÎâ`«éΩë◊«T– S•©û' 2j” d|¨W$V∂Ä]$–'òb0âVä*h∞‹N!aó+cW˙%Dh¯ øµË¯M2›Uà)•-ˇíf–Á…V<“`ä·E)£⁄z©v´ÒjÑ.Ωƒå bÍ¥W⁄£¥hM¨ ç_°<òÄ^¬´ÑrUÑP éíõz≤R–=V’(¨π—!rvìRÃ◊ÓL0˙¡ £‚GQ¿[	X‘“£©dΩ-I@Ñè;ÖÂ©á˛∞9ß+ÜŒ’5Ô¬∆Ò 9¬{∞8$˚"õå≤˝)›ûtEŒúb]âè§ÈpXíE]_ìÛW"∂∏IÔGZfÀfH"c™¬Â÷¬∑·∏‹ªT˘â&tè∂}c>∞†8icü‚è[.DF˙ãT_øå’èbÖA›q û(X§”¨âv™©¯	VÉb)V
+$Cá†ïÈTL ûˆÑç≠C·∂Ωß"⁄'∫[ΩßΩÌÏ˜ç≠UgJ¶Ë£`{â>?ãºp#Ω7jõ?ZŒA•!§äª-
+€EπUÜÛ,N`|sE9ù∏Øƒ-åæôzr:—IåkØX„n¿î”õlﬂ˝G6ã∫Ëèed4}¬√9x≈íÏõ∂›∫®<ÉD!ÌåÔ
+E	Ìä,7y[=uâ∂f~	‚7Ó∂Q,óèYTD(ÁÑYäK÷ÿK‘Ú#ˆÅ˘WI#ë]èLP'Ö‘	0"œ≈ƒ	ÚæáfÊxÇH`ú∆Å≥£Õò¡PºÚq€b'~Ñ©3N 7
+N≈˜ªê[¥ua*ï‰Q/™√Œ$V‹ÍNxooƒÄÕjqJï¶Y)3í˛“∆“’‹⁄¡Ô†¬»‹$¶LΩë<É]:Èu&Ú∆Ñ„¶b¡}P˛˝FE˙9MFI1ÏB!•ˆJ	c$Á=ó»u
+3_ß®ß¨*HçLß’‰ÛµÑV‘{b°ö\UßDË9Ò‘ﬂÜÜû¢ˆó>˚	[∫jôèyntDë&Ì©ÏÀ∑ç€&+(õ Ô≈¬˜V„ª¥ΩsØ?â=ÒAhÌèöÍÈT„ÀàEÒæå8EgnGﬂNÍÃmÓ˝ÎoÔ%ZmÕ°s˝Ìõw¶uw∂Èãﬁ¡Œ~á8ûv∑˜;?Ì$…≥."§|˛YÁ`ø≥ª++ﬁŒˆ≤Sœ‚ds˝	™›<åÙ„Rª˛yYÛNŒ… ∑L^?µ˛MºU~ÿxﬂè^#†Ú«ﬂ˝Îﬂ±ÔﬁvH£…¡∫ƒ˘ü	àÛñÚ-xi6î=¬µZ÷€=xéJŒ	¢zÉÊrÄB∂?;§?^?óöC√7	î(¢çS“´Îo#øïM0Î«>r"ˇx‚+9Üﬁ(r^„}«¬ı∞u “C<… 9u“ >‡ùcÍ≤h®ı÷:å=Gaπà¬„∞’n9¶	ÍË∑œÇ‡9ß˛1|¨ãK∆GÅ∫≠≥–‹g™ı‹£_Ñ€H•èÇáPLòü":—1txòØ;C≤o≈ûXFëDÌ"%Æ‰â¥
+Æj∆¸äü¸±∏Ê'ÁSÂL^J•ÆjP
+¨∆%L¸Ã‹–h˜ñï0∑/í,ê%kÕˇ0UÖPŒi©â°”•⁄X%zÇwg4∏P¸I2URYÒ˘”@‡  -±8ÆV 0331
+8e‹OÜ2•mıŒcÄ≈◊‘˘‹ÕûtÒë›>Sä÷”Íj˜ˆ'ëyéõ¸®(Ò∑®¬o>ÔÓt∑7z†¡Ôu©@Öm<ÎncÓPoØªˇ~≤µÛÛg›ŒfGV‚£ì‡lìxh>¡ÕÌOUâˇA˚Œ50£vµ,KE»Éì1}S~˜ØÂE]q’J≠?Áæ0*“Q!<∂y.º<X¸åZy≈ﬂ
+R&€ÂvŒâï“xMë◊ò¡HH®!KÄ…vn˙™.*k1Êb¯%-ÕRıèÜÚ≥Ô+6Ä67⁄E⁄LEß∂Éb™*ÛòRjØºEF∞$˘nÒs+|c„ø,qøoYûx˘¸W¶ÚPvJ=∏7éO[∞´á|Q	Z8–ÆíËÃÄÎÄâÇïVÖ&≈ûÍ6Ú&q2#îÛFn⁄^Ã¶î˛/K[|ÚëGh>îË◊ˇ¿v1@%o<˝ëˇe^0n#
+?8&8Ë$!É—Ò£é;ÙG¬xDÍ[~ñ≤ı"8Ì∏˚’ƒ˝”%¬ÄÄeKéCˇ‘Ä! ∫0ÜA–ƒå übFoÓ;’;ˆ€ú=W\µ‚q€‰ÃÌƒ¡{£æ]Æ´®Ç◊U∞Xvcg{g´#¯\;€õ;˚ÏlkÁ	€¬:ª=ˆ≈F±∞∂y‚Dª¥"Ru≥A≤ﬁ∫€òcø˛u˙Ë¬5¥ô/·Õl#3Å'∑û√¶úª¡èËö9≥FT©k®¥
+ÙµY¡P‡d«!ï:Ü	‡G¯” Y±¢	–¿æÊp3—©\,◊¯«†å-rdù≈s	˝VÙÕ«¡|»^Ö¡P‚d@[s˝„ kx`æí4,˙9ŒÁJ~√ï/Úñ*àœπ
+b#“ÃÏµ≈…˜∫°“bÖ‚ã5ÉN{¢!Ç ‚ï≈•±∂G"Õg≤b€/´UJ≈ æ‘XBtÄG†8≈>˛Üj&óª∏"Î@xÍ#îY‚Ω¿´ï>	·¿ã0ë–?Ú±DFΩ·8@ó≈@ÒZSó)[âÌ
+,†ß˛jæ<e∑¶FÚã≈¿˙zVj÷ç'±÷ŸGßˇQpÆÚE“ﬂ∞∫«˚»éˆΩ1ËúúCÂªQÂ¢w˜f	È‚Jésy.áÛ¡hp"QÆùUB Ûjq5Hù«Å”°ŸÂ\„–õ…º˛V?¢ã≥Î¸m6|%_
+ÖÔ;ØÚ1…ñ$^ƒØ£πÊºäë"X¬ „Ã€Ò`Mq›|ÈB≈ErÖ5„ß˙D£˙·á_äSÈ˛#z ª–ã69ˇ=Bî⁄‹ôÙm—å…=)S…Â”‚ó‹˚ÛS'†∆ÒüŒ“ü
+N⁄‹k…T§™˜=NMı2ùx˛-u_[Øöè+oÛ≈óJwπûÏtag∞"Í{ÇW´ÎF≥qºÏû˜a†eu"u∆c5«.U3±@øıYíUE[Ñÿ*pb¸!EÍÁ”™∞›(À∫Ãää	Æp	Ê◊“j]{ã^1dÈÃ§n4´*˝Sò√ôˇ∫‹&™ó–êàj|¸≠ê?UX¯pΩG9Lr±ES±√+(ÛL¸ ’üñF1}eQÅigÖ qç∫Á∞ú"‰:ªs«ø`/‡ÓñÔ*1™⁄„M/Ü-“s{x?ﬁ¿£†ë∑Î\ #€„VËú&'∑\'vc
+ˇØÕ4Q±Ú°l˜ÊZö™Jáóö0éf„Ë∆g"2u,˚`ã©Z øGÕ&J˙ﬁÙµ∑L ]W>	ﬁ¡ºpD¡Û∞1•≤â•( <@9êÎUŸ*ïå¥2) :Ñ@˛ß≈∏/lHqp|<†Ωdû5yOïäô?iıFRú¸í,ÄW™1•
+ l•˚#9tÉd´âÎ∏ìD&˝±êMê˚tÙÒcà&…pl‰ñ©‡Ù˝3>≠@ØÅ“’√˘iXﬁ≥ﬂ∆°2Jop∆”CTRÏØˇ⁄‚Ó‚dãIß–e¢ÁâL>ﬁj–È¥àqT∂ªVz/hŸπ¸Ω,ª%e"‰ì
+ ùìÚ,˚áNö¥}Ò{πyÒõ÷Uú˜Ÿa!⁄|–n@ÆÀÆé|r,iv<^¯¢Õöh∏&N,Ø9NF†’VQÏ\¶Îˇ„l+XK7√«ÏÂ3^ÕºBúΩzâ_aóºËÊwÿ~‚í¯bCKéó=ORF†}÷ÏmÆ±ø¸ ˇó´9zà±µYô¶u¥Â⁄∏ıuHìOc∑>	ì•˛¥]∏≠ôãı{r˚¯{πm<˚NÊ¨ Ä?¸ˆkû<L≥¯Ìø∞ÓﬁﬁŒﬁL"hû–´y≥≠j™JF v˜üˇÔË?ˇøõò%∆?Ù1Å’1ﬁ7˝ßzïL~á\(¢Ù‡bÇO.ÎbU¬+·ƒÆfı,jˆJ›32∂C–º"òbCw-˚ïìö[L»Ñ…èº ˆu·º≠‚””gëÍ+cÙ˜÷√«-x	≤Ëç∫Ú©ä≈π‘9í¿d8ÑØd_ƒå›†zâf¥I•≈#SÓ´Yy≤√kEq0ﬁÉ±sLòÜf˙ùÏ0ß£ZZ¨?›ﬂŸnâ$éW∂w©I3ÂFÆ„ì¡¿˛Í∂Ì•Ñ9Èev£[pæ%b$íqıD˜Úa§sK∞0ÌÚÑ
+∫mŸ⁄~Àéj…W%∆ä4ÿÍY£Iá-_W¡!IçCØh¯Ê¢∆íÔ2ı±ùK5äÂS8ÁÑ´n÷~\&ëbnpôgmÉaüåº´˘ëU
+&uâ∏WìLztZH Úü˚ñê<˝ìpπzø1‡1€∆êsA˛∏wÜLö¯ﬁ‡ºﬂ™ÓºÈΩ°Úâ9kX*f®ÿ/îD•åG+n	gZŒ^NUi[≤j6o¸∂%„Wjì˛liMõ-_<,∂K≈aÒ6èãKíj•I˜Yãap∂	ÔÇß©\ˇ>K]a{Öµ•⁄;GèSÖè©Œﬁ]yÅ·
+> i¥e©µí=õ‚&ât˜≤‰!'H/Q–:?YÄ™ueö5ÌÁ˙zAÓî {ià·lx§,
+-	çnÈ]¶ÉÎo˙#ø—/J›µ⁄¯≥ÒØP¢™>uñﬂ©}Ãôé@⁄	éI˛]O+π™Uˆ∂Ö ´∞<
+›ôQ(§¸{m=i˛òB˜îp4˚>G›Cî{x3êêŒ?x3ÚÒ$óN6£xﬁı£>£ü|ÿã··…x°O÷ﬁáGN0x$ˇlç9£ã{Ï¨ÁûØ¡à#§≈G)uw‡Û )ﬁ}ıË‘ÇWÏåáa¯r€Ä’˜ÃÊYk»Kœ0&[XèœÊÊÆ>^¯’ØP7)uja¢®ÔÕ_Q=Ω¶∫WsüˆU“çxÀégÒ≤‚TΩ(¿œÉ†"ämÃÖ-'ÁJ5Kπj¨ŒHÄ€WÂETcC≈Ù#πÿ~0pÜ<O4I]ıê•ˆ—»ãxMFYG√BÁu©F≈2õıæ%Ä1¨†!öÕ-`àpπ˝ ™>;©$)7)w<	EÈàß≤ÊN˝SU/≠RVsÇ0›÷fwãı∂∫{››Éù=*V‰I˛ÕÓfÔ†≥«v;øÿ⁄Èl≤ît´ª˝º◊Ÿõ+Vå=‚fÏå˝Ã ´Q§XÚÄÁÍ£aΩ*∆§ÑÕ1QßH‘E/¥üª¥˙E˝™Å’|’ Tb˛ñHÃ/π§Ç|∫Ω∞
+"√J1Öæ›gûÉ}©¢õÀtQù?*øÖm&Ö∫ ≤»îÙ=Â‚∑o>ˇ®‡≤»∆ØHQ§„T€Ω˘Æ6Âÿ2%?sbìé¡ ó@GpØ%ï∂œ√<ÏX†c0§ßX`Ö`∆ú}éA8®ÌLª¶Èÿ7xb≤ï‰ë‰“–üfÂe˝FLîAQ˚ÀJeéQG†&Úäçqíô∞¶Æ4‘=?ıÈ\úû
+∑F3,,ÎÜlmjºÓ|e.V¶âg® 5∞56ñ´\Ω¡&w–›ÓmÓXæãáŸ…=•[ª4ÁY—⁄ÅASæ+wUw9£'H- M·Áò[”õ"óØ£`Ù‹¯.m§‹.Áõ>rbwÊEÖâ"Ã,ÍhÀ∑–Ö`MŸùä≠{'ïÆlz9}§ÊK¸ˆk˛˚>héÁ~ƒû”ã®)≈=Vîk\;&Äó≈≈GI‹ü*…(%@&tıSL˜cyv
+µÀöGdènûÍ1ç¥U"ñ :w‰†ß˝¥,+zLqπÑ"…÷¡ káìV˜≈Ÿ*•¥ÙÛA^{ñÉ¥&9;P*Ω◊‘#(™ì¯©Ç.ó√≈)B((^"BrQÇ§[ø§ÔÚõÍ¥∏äı5gEîÄ¢‘ï„Ñ¯∂ºéﬁ%s@˜êºZVXÙÂö¸›?æeﬂ˝«œ'◊ﬂpt‰àqldÁ´…ı∑Ej•"ÖœV5˝áø˚lˆ@¨nÒZ’°∏û^uêíÿì$˝èñG˜foqóú¡WJZdPçzmˆSÆó4j•ãöÜp!•C\⁄êx§¸&bÃ„∆>Õ˚ê*\CÔx@.¿r!*#„T™ô;‘ÕTu–Ë∏&ŒÈù†uJªü}`_X«ÒÈ¬˘ƒ#©k5ÚáìutU·∞·ÊÖÎ‹¥%iƒ3ò¿ä‘:}¡ªRÉ!ÆâíaQ)X–¥·˜UGÂaªŸÕ]Øﬂ∆rÙ,;`gîsÑhuÍ◊ıâ˝∆Iê˜ÇZN4mªBøJ√HÅ&Ö§π•m‰R∂áNfŸêî$R…Œ®ˇ»q‚ù;VZi*Nt1Í33+è¢≈9Wé^a‚ZÈKníw∂.+Q9uP£∂F˙8ÚÎ—’Íz∂õ»,ˆÆ◊"Xvq’¿*_	˘z§.àL†’j’∞dÃ9s|˛v89™u37b%∑˙"?êD;—Â›‰&.∑≥pyç€ ∑‚•◊XÉ˝ÑUÈôeŸ3ŒÀó∂Sº<ï+]{Ó¿LÖÆÃÇPÃ Â¿…ŸxvTYÀ<±ÍƒÑµ¨i5ﬂ C•ºê4√¡D_,µ€_2áÄísã≠áJ¥≤™§áÚjEi¸úãQ$b≥.vÌ¢ï?;50–ˆŒAÔ”ﬁÜ ˘ÈÓÙ∂vÿÁΩÌÕùœ˜Ÿ€Ën=€ÍÏ±ﬁˆ<êS,°≥q–{û√1‰„∞ƒ§5QñEÄ Å¿\ÒèOb"Õ∆(¿√Ñu<&éˆ\u‚√’2(ûÃêPÌõ^.b≠ û˙¢Ï¯-põó
+∞PP&‚[äÀ>˜Ç6W5‡ÉØ>yÈ#xhøl¿î\$x1÷¸ÕG√#,2f§ÿÂ°œçG#I¢C.*oáJ+T$ñ5¯#êä≈Í—dt’w∑Èä¶, IT	È≤»1›ûxßNRY0q2:çˇÙOˆﬁVm2iôj£Sö¨:öçraQÖSÍkñ®…5Â
+£5çG˝A)%âèéDπp≤lÀ{»˚a1»á!cSë¢b!LÈ¯∑F¡(Ùë¡h‡¡ñãuÈÜÖ (Y^*;™*2¥ºJ˝D∫…Eº÷‹ZEá«pÕ!Ô5uñ∞ÚÒ∆);™Æƒ¶A5’—Ô°∫ßiùø ØµËUÌÖÇk3àk©ZlßùZMDhDÇÅÚ\>È%6ƒf˘}5z$¥“ãP[Äe&πYOº»Ω≤à´«—†ùïœ™ÈìÀ≈ïXG´Ëó$1‚Cf,¬æP›Ù.|s”\¬0r“÷ù™÷”Eı¿9j6»å!*3Sá4´£˙Â…Öˆπ˜¢~†í=qN=ÓGÚFØÇ>πÍ∏c≤Ω‡}X˛‹√˙åæ∂éΩ∏;«O.zn≥qüŒSCÛC∏V˜Zh^¶ÕÈ}‹È%-ﬁÒﬁ(û˚ﬁYÛíy'Œ©èÛ∞É >i‹„˘sx’õª∫A8q‘€∂¨ˇ(îÚÇ÷.ß*wgŸ¥I7¨DåÜv[◊s¯(©hYÔBÔdóN ô⁄L·]—YM)Ñn˝ë”ï=Yç„¶ñS+r˛kÏ‰7f˚ ,*«lÁŒfá5ëèÈy9òv˜∫œ{ˆãîåiÆl I+j-C(Á^œ]ïWU∆s◊)Ã–Ó∫T©åœCaYÕ’Æ¥ü¶MZí˚π§¿ò÷åí€m+”òj*πh;§›aü(ùå	Êë»€Mˆ¶ç‘°4l∆Õwo∑ÆøyﬂÕ	ZŒM§ÂºC¥Pˆñé1ë´†¡sÀÑk√ Ó&ÓLäª:ØK˝›ÏB
+Èñ†Í´O‚ÙÊ€ÏR]i∫ΩZ•¯–sUø›–;ıë=≈KI∂6+GR´¬ãø\ZZj/≠|π∞™ç'„¬™%d-‡≈ˆYE5†\Íä	M>'/™ÈÚå¿î2((ºµ	@ÍÚä‚åJL‡<ûœœ∞ÌÖér^Õ¥"æ´q~∂ˇ¨≥◊€ôzúÂeV@#—Ù#¨∂Ã˛§«î≥ÉΩŒ~˜˙7ùŒ8kÕ‘?È°ﬁ›Ílœ∫fPj :˚g]{è‘çÌT £'≥ç‹,¬Ë&ø˘S¢ß[«£∂˙µ
+MGKF“y·`–ı[v+óã™£ãZ‹3ıxBﬁ%…{¬‹Ÿb,íX}õ<≈&a·©Ó„ düü8q√Ã®ätæVa`∆6†Úiˆâ¡°8Cv	˜ºÍ:õzÀ5@ÆbbÇIÄÁ⁄>B„‘?s≈Í>DÔ4<V€ˆıKé°˝Ãó¥}ií⁄<Ô?1#∫@>!JZ8~‹:ÔN¬AÚÈ≈L|ºÇZ?â„Ò⁄¬¬©?û?èO[–´µãï’ˆ#©‡\g/Ô~˜ˆ3§°¯‡ÔÍŒ]v0·LÇ†FÍ¬·	l4©aû›%Á Ú? 7ü|ÆΩ
+1Î°u)ö˛Ô~˚ø9˙ÂËnä”m≈±0¨›˝ÂËèø˚Õˇdwî«ªÏó/?∏î%ÙÍó/Ò¢˙ªª!‰„˙ﬂq°,e‚¬ØˇªKëª2¯≈ØÏ˘oÏnÎB°opÖ]˚ÓÌÃ*B¬ã s5`∞—≠;b£ 
+‚Õ⁄üOº‰≈Ëp˘y‡EqË≈ﬁ»‚j¥^Zøó≈îRÄ©`ÜU{ëß–≠LíÆs)sÅ9s∏‡æDÒã@˛Œú÷–[Äq∆{[°„›˜öø‹\8æáÓ¸´«∏}¨p	R∏ﬁ≥Ωﬁà7\; ^ÛJ9jåù˘#78kco‘§CãáGA•C—˜ ü¶4û$C']ˇŸHÏ)H‰{ÉÎo^°	(U¥íP';á2Øv éƒ|Ö):íSÎæÏó<R7‰∑ ˜AµÚ∆›—∞Ò(:qBmº≈¬	c?,Ì‘¬;cÂf(ﬂçG¶ÙAµL	ä≤ee∫‰Õ˘Ô?ZÃêNYfÂ∑lf…òÛ-Ûgßsﬂ#uÍÆs#Ú˜RÚ‘HÑTA:ŸøÆû'~ïJ/hÓ+äñm\ÙU»∑ òö˙ÔìTø"Éj9ﬂ©6ßóùıπ§Ì:§jó~ÕD5º[ﬁ):´wù(`übâ±•´Yô"¢#=ïü[˛W™8¿y˜ 	D‰ƒ˚ 9!í¶Ùà7KAπÁ`Rﬁuâπ˚v6áÒ(Î
+9Êô	ﬁ∑ƒN˛ è£´∆“Oé$∑'u7kÍJï…U
+Æ‹|)O⁄D¶¬ëì≠,QQ∑5‘L¥äôêÑ_.usÇvÈÖ¯à´›»ø9‚k<≠;t¸Å˙q∏ñYá˚)¸»#y%®10∑ä/´Å…À†˚8 ìJ§	Å˘√:{˚ˆ#†.’√òÃ˛ô˙» A≠À©PS.CÖ÷¨õ.—ÎÕ∂ÏÎP5·A˘Uä_ç›Uåô‡+˝ar-˜\qƒ∏÷◊âN<7ø-+W¢è ÍË“¢ñIU•BÊ.zvéÙ–»›kYEP(1m’∆THg<Z++˙jÌ)wúâ{8câà	Œ´+Ç#2‡ú	ŸÜ3é'°clM«âgÑ|Â¥D'N!I÷†Î{wuóIΩM}8≠H¶êß≈ä™¨‰∞,/ßNêÀ ﬂFÆ1«ﬂ£«≠ãJ¬0~†7Ø”Á∑eÌã £¥Ô·9˘r§ÕzÚŒ∏»Såc¯ÂMRâî,XtdÑjÂè
+9ûœ:yg†nº=:a„Â7µÇë(ﬁjR’Å¯Ø ^ãˆìWˇ¬Â“£¨ ÜMÂ˙≈ﬁÙù—©…YåútH$26¸‹[ﬁ‡”Œáü˜6>É6ai´s€g›ﬁìœlÔx1Ém#>ÅpêËgª€N<åtâ˚¯/J≤¸Å2Ã¯H¥`ñf’}ÈËÿ› ≤Æ>u‚ì-◊Õ¶8yWnnÅÜ%Œq2piV∞∆ï◊v˘GEº«#ÈÎ€éK˙“∞sws≠-$ü n\≤·N€∏°ë©ñ/>”Z…õY ≥∏+Ì∏µ8ã˘ü√M¢XÕ	ËÈÊ}€µôÛîºü€}5∏∞ÂÜŒ_˜`Ó›cãÙ?z’{uæTíÖæEûãIk˜W≤7âÉM∞õûÌm5≈∆˙zÏ7‡a≠˚´V¿äY“…w√ x≈{\|úUC˘jSyo´q{¯Ó≠–H“çœElÚPäã„∞ÕˇÜÓœ>ôªcÛ=kL`’—N(Ùbzúb€˝∆k∫Ç>ˇ»%“ÇŒœ
+Â@åE≈r¡±ÕË/ºW**©6ÑO
+È]A≈6´ªx+ﬂ`¶/P…FÎÛoa1ˆÊëø≤Qò8à∂≠∆t„8√(ﬁ¿ZåQˆQã7æ•©„#Ñéåˇt¢d)&@óÓ´kÿ ∂:ó„¬÷Ékkç˙cP4∆Y∫y± XfHÃ˛Z¡ÇÇ¡¶√1˚M¯|Î•w∫ÇılI æıŒ•‹{n Ω∆L∫>ˆUâ,d˘z3õ/AÖAÃA∫C/s◊¸¿\QçGºó€À:	]ﬁuéΩ#… ˆFaÙì` mØ7∫Ø◊RwïèiX™û`˛ïÔ¥¯?˘óKÌÂï’˚hŒ*r\
+†£T,®ö-ap≠_∂≠–Â“µ0i∞ôGì´*r*(}ÔàﬂãÉΩƒˇ)LÈ\	5,sRÈP“‰ªW3O}¡Û]O[õyœ‘%ÎÔ"Z$‹p4FeØ†)í›÷ªmºze/ö:¨M9ºï!ßN^ø-¨h+œ™∆’„ÁNq55»5nÊÓ+Á4Ô±hr‰1„+;¶„úcö≤O"Ë®›«ı–BJ¸/,2ﬁü˝Îåπ‹4„p¢…8™@'öå]¯¶.ÆuËz´œ+‰åﬁ8Ë">∆+ºà˛™Ò¯â|«‡l?Núk†xÕ9∞Àz˚;˚§[†„Ky7X/Tãæ≤ÿ≤‡ï6k†ENjc—,¥‚ù˚H;ÓπhÎ oáÔÂˆ@DœõcçqKd˙.q$`˚“9≠ˆí∏¡C?ù¸ƒ;–Ã««Ïí¡@ O!]ˆ%òk=’w◊ÑØ]ùCJ1éÀ˜Á@Y<‚[≥}è--H±≤óY+æ]ıM<”≤p#?©øY —wJgÙ∑%áF≈ùR@|Å¡ëyÚ∑¡Èp‚cêÇÚ8/*‰˚ê"q‚n˙Eœ‚æ§◊‚÷SÀ€≤~'=Æ∏5Î‡0Ìb˙;æ üxÜ‚†ëvïZ1≥≥â;§—≠æGZAa]3é{îR∑G–èˆÈõßQQ´FJ„ÈG{â‘k)7JBòƒ˝ºcù∏fè-•}356BeL‹I?sa÷YMZ Óu\Æ/∆gÇI^≤aÚc’≠Uñ\‚I‰Ù∂ù∏∑ à^Wÿs+õ‡oû‹òË®8Ú˙f¥XX`Œ†OŸﬁò¶ÓR. ºmÂ+;“Uüº]wç¬8Âæ;vÛé¯{q©™|sﬁ©CÏäÙ‘«¨ë‘
+Öw˙ux/îI‰xT˙˚L/ÛC¸ÏﬂäÔ %	tÕO!5Z¸“ÄU}	]◊A.üPçe∞'Â3öã9vbî‘ÿº
+AUh äÏa¢¡ˆSÆ1ÍH‰ÖqÛØ/u*_4 Zçiπ–k:…»O-î9n<âNöºA≠z¶ˆ iÜ¥ÈO’ÍnS~∞ÊaÉ†Ôˆ„ ©n°b+m≥qºÏ*ø¿Ω"—VÓ	∫œ"±Âyò”{4`I»˚ìêõ’⁄˝V–ˇN(“Jõ˘≤î~™fË2òfóWs:óü⁄9ò:r√/,ºåÑhê˜*È™‹”{¨ÿ”µ¸Îi:Ãgâ3ˆ©~§Ô	≠|_j∫ô{∏ƒ»tèˆ&Õ‡ò¿å™|&S)|ÑÇ≈Ö%ë¡ƒ•äª˛Ê‹èM∞®&∆*7ë_¶ëÿ† µ∏pÆ±.%‰Tî1¯ıÍ•Ê¡8{ù·™∂Äı#cUﬂëA
+˚•∂Î∏`åµ ©sE¢0*‰1üG≤#E$à›b.◊Õ’Ç(ﬁW√2Ú±eÜUíÀç®Lÿ˙√˝Ω»¨Båw∞maé+˚Â'ÈòCl;UëRˆbâÁß‰K“O1Û@Üw’ö°≤£eÏªä]n1^bSªÎ˙)wQw‘wéº7ÑïﬂÏç®ÙÔãÉÁ9x$n˛‹ É^Z¶q3Ùq £T´qkÂJ∏¡q
+N[+˙""√8z^ª©]EŸAEAÊ◊®—xò`#=r#-˘·JÆxA]rß*`|ÚYÂf66U∫yˆ&GUTgïôÑenÈ˛U©Wú`juQMhI(Õan¿ú”†âÛ†4/e|™*|Ù›¬ƒIºÛ7WªQ¢wØ~¸E2\î§|VèZ8Õ≈6A9Nˆ\ç“´ï©UçLq˛Ë›–{Âø&˝ÊﬂÅEzç>\Gâª*á œ⁄≈G4Ta7ê‡±¯¸≠3˛/u‡‹6Ãvê5–$›VjÒÀ5πV†tR––‚Q'˜êá·¶+gì"qÌÑÂ8èt´ù˝∆∞][˛Û|ùÇ(+e˛#qæ§ˇ7ê7Ù©úc™ﬁFí˜'ﬂØ √ÛoZêyìÔ˘œKêª1Xó^Ããè>	b°ónÑ◊ﬂ ˝aÙNÑ∫¢ém·ìnF¶ÂﬂãÙ;i+%≈TÛ)hH’DTñ*vB>•MÌ(K§Ωﬁhr)§_îï”5L9ÀãV9ir:åd3˙’°Jm≠Ù@$QVÍ´Õ‡√¸vﬁæsÍâë∑ÌD§”'Êq¿dﬂÕMVÊ·—D÷Œèâı11VÜKÉDXÿeﬁÃ‡±X—x,úµ«lÀôå˙'c«Â÷Z—k±=ÓπÔ˝Ô˝?*Wì÷È0(„≠ÿè•´æ≥ÇœÅ~Û£˜R–Ù:ôÒ—‚È…óeVzbQ8rBÆÁËêœ0äÙ¡ı∑ÒdHzÙ≠™Œz±√Cß0„]ô∂åø›c‘»{˘œÀÏ˚ƒqè—” Å<˝SC“¸M	Î>rVa•FﬁÎ≠	k·,*Ç=å:ÛtÅ†Ã+¸√êhÿÏ)fﬂá◊á˙˙†œë.ÏJ«°V#¸∑«h~U¿gTZ™„˘ÂjÑ¢Uç™•&ﬁ°⁄ü÷Øºã®Ÿ€ÿŸ>|⁄Ÿùkùq≥È√;˝Ãª0‘ÀÒ¨¸^)‰#[gI3/D∆î Ê§‹DvH¶.ﬁπMË∏òrÕõ1Â≈kÍ∂Ùu …ÔΩ~)†/2‰oJó^©≤ÎuãJÚzk…ªi1P¨Ç0•“6R2≈krH…pRΩ~"õ™¥∏t)Lœ±º÷À8Î“‚j∆ÍÙ°˘!kÙ3_ÂJZQΩ“.˚MV’n^ªÙ°∂«e:ŸÏ E®R¸tE ‹˘ôg–ü”;¥dWx®cfØÔ£öÎêçê{ÖÌ?¬ÿÓˆì%~J”Íù≠˜çG‚¯*œv=ò9#gÄµˆk¶/4ß]ˇK'2%6÷8“ñßI®±£™ÿ<VÏ6ÌÑ—Å2U0‚ûÚñˆ4–úöébcÈöÅ†ÜÂ±äaø*ı?_K${^FªAw—ÜWøNV˝)çúO‚6%áhÅ{@ØˆqÉ<!AU 0„\;Mî‘çG‹iàÏÔ#é:ñıÅchõ7çòq˚∂ŸñÌ7ÂL$x!ãaOV0¯-qP‡0àº<˜!ùπüœÈ+˙ÖsÀ’ç:“˘°˚¨?ü¯*:?y√N°˘`⁄Ï;{ÂCÇ—fËÔ¿HeXc`jçC!ÿÙ^9ìA‹ú˚]≈?ﬁå+q -Í>lœÃub')À∂@5≥¡4õf,2ÜQ'(Y‹qz.˜¯[^ÊSÑÜ<‚LDCeák >híÚuﬂﬁÇ≤7µ2»•†≈4˚ê˛˛°∂cÙgQ≈>ƒw¯–|)«√ã9ÿ–xtZ?˝ùˇ‰|8H~E¢ä∆ÇQü‹Ñ,'í¨ ®|≥CÂŸJÒ;ê„wâ^b˛⁄}îj› jÊÇ¨s-©mÇ’õEb◊*ÿl€GÒÁ<Èﬁ™åF_¥4v®ùô% ynû)R€Ò∏ôdv≤yWÿ}ÙÖ≈Z–e8ˇP5·¸∆£N:HÉÅ‰Nÿ?=ê9_MÆøe;qﬁ`°w_P.ù√õÑNXSM|®‡êW9’4*Rÿò‰˝ÄxO–ÇºG‰˚ÈÓ÷Ñ[◊√2w˝ãJ\ÈcÇπ˙
+ßN±)⁄¥¶.*eÏIËu9€Öπö∂Ö©[p	∂IÄï$ˆ∫æø[è>~˛≤Æ«>muIkˇ⁄Z±*;üÓ÷Ü‡f ©√ ∏ ≈ÿ ]Ω§[¢ÎxKñ<äÊÊäø∞V÷åÁãÅµ=†3]-Üô¢/RÉ,¨Ï[≈§&`≠På ¡ØÒçt@˜5ÒÔø˜•¢˝ß∂T(ë≤®-≈Ì˜K≈vêˇ\óä}rm.œ©tœ˚¨⁄í<ÃûUãCn?‘Y@0@~Í˛bâÔ}VmUVmÓ‹‹ﬂ¸≈’_¸   ˇˇ üa¢·

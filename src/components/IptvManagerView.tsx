@@ -84,7 +84,9 @@ interface SalePlan {
   tokens: number;
   price: number;
   screens_api?: number;
-  comision?: number;
+  comision?: number; // ComisiÃ³n total/vendedor legacy
+  comision_vendedor?: number; // ComisiÃ³n para el vendedor que despacha la lÃ­nea
+  comision_padre?: number; // ComisiÃ³n para el invitador/patrocinador del vendedor
   categoria_nombre?: string;
   categoria_id?: 'demo' | 'vip' | 'xxx';
 }
@@ -600,6 +602,8 @@ export function IptvManagerView() {
     provider_cost_id: string;
     screens_api: string | number;
     comision: string | number;
+    comision_vendedor: string | number;
+    comision_padre: string | number;
     categoria_nombre?: string;
     categoria_id?: 'demo' | 'vip' | 'xxx';
   }>({
@@ -615,6 +619,8 @@ export function IptvManagerView() {
     provider_cost_id: '', // ID del costo de proveedor enlazado en la base de datos (para provider)
     screens_api: '',
     comision: '',
+    comision_vendedor: '',
+    comision_padre: '',
     categoria_nombre: '',
     categoria_id: 'vip'
   });
@@ -4014,6 +4020,8 @@ _Â¡Gracias por confiar en nosotros! DisfrutÃ¡ de la mejor televisiÃ³n digital._`
         provider_cost_id: plan.provider_cost_id || '',
         screens_api: plan.screens_api != null ? plan.screens_api : (plan.screens || 1),
         comision: plan.comision != null ? plan.comision : '',
+        comision_vendedor: plan.comision_vendedor != null ? plan.comision_vendedor : (plan.comision != null ? plan.comision : ''),
+        comision_padre: plan.comision_padre != null ? plan.comision_padre : '',
         categoria_nombre: plan.categoria_nombre || '',
         categoria_id: plan.categoria_id || 'vip',
         max_connections: plan.max_connections != null ? plan.max_connections : (plan.screens || 1),
@@ -4037,6 +4045,8 @@ _Â¡Gracias por confiar en nosotros! DisfrutÃ¡ de la mejor televisiÃ³n digital._`
         provider_cost_id: '',
         screens_api: matchedProv ? (matchedProv.max_connections || matchedProv.screens || 1) : 1,
         comision: '',
+        comision_vendedor: '4000',
+        comision_padre: '1000',
         categoria_nombre: '',
         categoria_id: 'vip',
         max_connections: matchedProv ? (matchedProv.max_connections || matchedProv.screens || 1) : 1,
@@ -4095,7 +4105,9 @@ _Â¡Gracias por confiar en nosotros! DisfrutÃ¡ de la mejor televisiÃ³n digital._`
       toast.success('Plan mayorista del proveedor actualizado');
     } else if (editingPlanType === 'sale') {
       const screensApiVal = planForm.screens_api !== '' ? Number(planForm.screens_api) : 1;
-      const comisionVal = planForm.comision !== '' ? Number(planForm.comision) : 0;
+      const comisionVendedorVal = planForm.comision_vendedor !== '' ? Number(planForm.comision_vendedor) : (planForm.comision !== '' ? Number(planForm.comision) : 0);
+      const comisionPadreVal = planForm.comision_padre !== '' ? Number(planForm.comision_padre) : 0;
+      const comisionVal = comisionVendedorVal + comisionPadreVal;
 
       // ValidaciÃ³n activa contra lÃ­mites actuales de la API de Proveedor
       const selProv = providerPlans.find(p => String(p.id) === String(planForm.provider_plan_id));
@@ -4126,6 +4138,8 @@ _Â¡Gracias por confiar en nosotros! DisfrutÃ¡ de la mejor televisiÃ³n digital._`
           price: Number(planForm.value),
           screens_api: screensApiVal,
           comision: comisionVal,
+          comision_vendedor: comisionVendedorVal,
+          comision_padre: comisionPadreVal,
           categoria_nombre: planForm.categoria_nombre || '',
           categoria_id: planForm.categoria_id || 'vip'
         } : p);
@@ -4141,6 +4155,8 @@ _Â¡Gracias por confiar en nosotros! DisfrutÃ¡ de la mejor televisiÃ³n digital._`
           price: Number(planForm.value),
           screens_api: screensApiVal,
           comision: comisionVal,
+          comision_vendedor: comisionVendedorVal,
+          comision_padre: comisionPadreVal,
           categoria_nombre: planForm.categoria_nombre || '',
           categoria_id: planForm.categoria_id || 'vip'
         }];
@@ -5780,9 +5796,14 @@ _Â¡Gracias por confiar en nosotros! DisfrutÃ¡ de la mejor televisiÃ³n digital._`
                                     {!isManualPlan && (
                                       <>
                                         <span>| Conexiones XC (API): <strong className="text-indigo-500 font-bold">{selectedConnsApi} con.</strong></span>
-                                        {comision > 0 && (
+                                        {(plan.comision_vendedor || comision > 0) && (
+                                          <span className="bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 px-1 rounded text-[8px] font-bold uppercase">
+                                            Vend: ${(plan.comision_vendedor ?? comision).toLocaleString("es-ES")}
+                                          </span>
+                                        )}
+                                        {plan.comision_padre && plan.comision_padre > 0 && (
                                           <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 px-1 rounded text-[8px] font-bold uppercase">
-                                            ComisiÃ³n: ${comision.toLocaleString("es-ES")}
+                                            Red: ${plan.comision_padre.toLocaleString("es-ES")}
                                           </span>
                                         )}
                                       </>
@@ -9417,2996 +9438,135 @@ ALTER TABLE public.iptv2_dispositivos_mac DISABLE ROW LEVEL SECURITY;`}
                           else if (nameLower.includes("6h") || nameLower.includes("6 hora") || nameLower.includes("6 hours")) hours = 6;
                           else if (nameLower.includes("1h") || nameLower.includes("1 hora") || nameLower.includes("1 hours")) hours = 1;
                           else if (nameLower.includes("4h") || nameLower.includes("4 hora") || nameLower.includes("4 hours")) hours = 4;
-                          else if (nameLower.includes("2h") || nameLower.includes("2 hora") || nameLower.includes("2 hours")) hours = 2;
-                          else if (nameLower.includes("12h") || nameLower.includes("12 hora") || nameLower.includes("12 hours")) hours = 12;
-                          
-                          duration = `${hours} hours`;
-                        } else {
-                          cost = 0;
-                          duration = demoPackage === 'pkg-1h' ? '1 hours' : demoPackage === 'pkg-3h' ? '3 hours' : demoPackage === 'pkg-6h' ? '6 hours' : '4 hours';
-                          maxConn = demoPackage === 'pkg-4h-3p' ? 3 : 1;
-                        }
-                        
-                        return (
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-900 border border-slate-800/60 p-4 rounded-xl">
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-black uppercase text-slate-400">Package Cost</label>
-                              <div className="bg-slate-950 px-3 py-2 text-xs font-bold font-mono text-emerald-400 rounded-xl text-center border border-slate-850">
-                                {cost} Creds
-                              </div>
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-black uppercase text-slate-400">Duration</label>
-                              <div className="bg-slate-950 px-3 py-2 text-xs font-bold font-mono text-slate-300 rounded-xl text-center border border-slate-850">
-                                {duration}
-                              </div>
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[9px] font-black uppercase text-slate-400">Max Connections</label>
-                              <div className="bg-slate-950 px-3 py-2 text-xs font-bold font-mono text-slate-300 rounded-xl text-center border border-slate-850">
-                                {maxConn}
-                              </div>
-                            </div>
-
-                            <div className="space-y-1 col-span-2 sm:col-span-1">
-                              <label className="text-[9px] font-black uppercase text-slate-400 font-medium truncate self-center">Expiration Date</label>
-                              <div className="bg-slate-950 px-2 py-2 text-[10px] font-black font-mono text-amber-400 rounded-xl text-center border border-slate-850 truncate" title={getDemoExpirationDate()}>
-                                {getDemoExpirationDate()}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* Contact Email */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-slate-400 flex justify-between">
-                          Contact Email
-                          <span className="text-[8px] text-slate-500 font-bold lowercase italic">Opcional</span>
-                        </label>
-                        <input
-                          type="email"
-                          value={demoContactEmail}
-                          onChange={(e) => setDemoContactEmail(e.target.value)}
-                          placeholder="correo@cliente.com"
-                          className="w-full px-3 py-2.5 bg-slate-900 border border-slate-800 text-xs font-bold text-white rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        />
-                      </div>
-
-                      {/* Reseller Notes */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-slate-400 flex justify-between">
-                          Reseller Notes
-                          <span className="text-[8px] text-slate-500 font-bold lowercase italic">Opcional</span>
-                        </label>
-                        <textarea
-                          value={demoResellerNotes}
-                          onChange={(e) => setDemoResellerNotes(e.target.value)}
-                          placeholder="Anotaciones referenciales para control interno..."
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-white rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 max-h-16"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {demoStep === 2 && (
-                    <div className="space-y-4 text-center py-6">
-                      <div className="size-12 bg-indigo-950 text-indigo-400 rounded-full flex items-center justify-center mx-auto border border-indigo-900">
-                        <Lock size={22} />
-                      </div>
-                      <div className="space-y-1.5 max-w-md mx-auto">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-white">Restrictions (Omitido)</h4>
-                        <p className="text-[10px] text-slate-450 leading-relaxed font-semibold">
-                          No aplicaremos ninguna restricciÃ³n de IP, agente de usuario o bloqueo geogrÃ¡fico para este trial. De este modo, tu cliente podrÃ¡ probar el servicio de manera 100% libre desde SmartTV, mÃ³vil o PC sin importar su proveedor de internet (ISP).
-                        </p>
-                      </div>
-                      <div className="bg-slate-900/60 p-3.5 border border-slate-850 rounded-xl inline-block">
-                        <span className="text-[9px] font-black uppercase text-slate-500 font-mono">ESTADO: ACCESO ABIERTO DESDE CUALQUIER LOCALIZACIÃ“N</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {demoStep === 3 && (
-                    <div className="space-y-4 text-left">
-                      <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                        <div className="space-y-0.5">
-                          <h4 className="text-xs font-black uppercase tracking-wider text-white">ConfiguraciÃ³n del Contenido Autorizado</h4>
-                          <p className="text-[9px] text-slate-450 font-semibold">Tilda o destilda las grillas impositivas comerciales que este trial tendrÃ¡ habilitado reproducir.</p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            if (selectedChannels.length + selectedMovies.length + selectedSeries.length === 0) {
-                              setSelectedChannels([...AVAILABLE_CHANNELS]);
-                              setSelectedMovies([...AVAILABLE_MOVIES]);
-                              setSelectedSeries([...AVAILABLE_SERIES]);
-                            } else {
-                              setSelectedChannels([]);
-                              setSelectedMovies([]);
-                              setSelectedSeries([]);
-                            }
-                          }}
-                          className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-extrabold text-[8.5px] uppercase px-2.5 py-1 rounded cursor-pointer"
-                        >
-                          {selectedChannels.length + selectedMovies.length + selectedSeries.length === 0 ? "Seleccionar Todo" : "Vaciar SelecciÃ³n"}
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Canales */}
-                        <div className="space-y-2 p-3 bg-slate-900 border border-slate-850 rounded-xl">
-                          <label className="text-[10px] font-black uppercase text-amber-400 flex items-center gap-1">
-                            <Tv size={12} />
-                            Listas de Canales ({selectedChannels.length})
-                          </label>
-                          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                            {AVAILABLE_CHANNELS.map((ch, i) => (
-                              <label key={i} className="flex items-start gap-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white cursor-pointer select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedChannels.includes(ch)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) setSelectedChannels([...selectedChannels, ch]);
-                                    else setSelectedChannels(selectedChannels.filter(item => item !== ch));
-                                  }}
-                                  className="mt-0.5 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-0"
-                                />
-                                <span className="leading-tight truncate" title={ch}>{ch}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* PelÃ­culas */}
-                        <div className="space-y-2 p-3 bg-slate-900 border border-slate-850 rounded-xl">
-                          <label className="text-[10px] font-black uppercase text-emerald-400 flex items-center gap-1">
-                            <PlayCircle size={12} />
-                            PelÃ­culas VOD ({selectedMovies.length})
-                          </label>
-                          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                            {AVAILABLE_MOVIES.map((mv, i) => (
-                              <label key={i} className="flex items-start gap-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white cursor-pointer select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedMovies.includes(mv)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) setSelectedMovies([...selectedMovies, mv]);
-                                    else setSelectedMovies(selectedMovies.filter(item => item !== mv));
-                                  }}
-                                  className="mt-0.5 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-0"
-                                />
-                                <span className="leading-tight truncate" title={mv}>{mv}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Series */}
-                        <div className="space-y-2 p-3 bg-slate-900 border border-slate-850 rounded-xl">
-                          <label className="text-[10px] font-black uppercase text-indigo-400 flex items-center gap-1">
-                            <Layers size={12} />
-                            Series VOD ({selectedSeries.length})
-                          </label>
-                          <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                            {AVAILABLE_SERIES.map((sr, i) => (
-                              <label key={i} className="flex items-start gap-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white cursor-pointer select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedSeries.includes(sr)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) setSelectedSeries([...selectedSeries, sr]);
-                                    else setSelectedSeries(selectedSeries.filter(item => item !== sr));
-                                  }}
-                                  className="mt-0.5 rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-0"
-                                />
-                                <span className="leading-tight truncate" title={sr}>{sr}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Botones de navegaciÃ³n del modal */}
-                <div className="flex justify-between items-center pt-3 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setShowDemoAccountModal(false)}
-                    className="px-4 py-2.5 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white text-[10px] uppercase font-black tracking-wider rounded-xl cursor-pointer transition-all"
-                  >
-                    Cerrar
-                  </button>
-
-                  <div className="flex gap-2">
-                    {demoStep > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setDemoStep((prev) => (prev - 1) as any)}
-                        className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white text-[10px] uppercase font-black tracking-wider rounded-xl cursor-pointer transition-all"
-                      >
-                        AtrÃ¡s
-                      </button>
-                    )}
-
-                    {demoStep < 3 ? (
-                      <button
-                        type="button"
-                        onClick={() => setDemoStep((prev) => (prev + 1) as any)}
-                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] uppercase font-black tracking-wider rounded-xl cursor-pointer transition-all flex items-center gap-1"
-                      >
-                        Siguiente <ChevronRight size={14} />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleCreateDemoAccountSubmit}
-                        disabled={isSavingIptv}
-                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:text-emerald-350 text-white text-[10px] uppercase font-black tracking-wider rounded-xl cursor-pointer transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-950/40"
-                      >
-                        {isSavingIptv ? (
-                          <>
-                            <span className="size-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" /> Creando...
-                          </>
-                        ) : (
-                          <>
-                            <Check size={14} /> Crear Cuenta Demo Activa
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </>
-            ) : (
-              /* PANTALLA EXCLUSIVA DE CREDENCIALES CREADAS (COPY-PASTE READY) */
-              <div className="space-y-5 py-2 text-left">
-                <div className="text-center space-y-2">
-                  <div className="size-12 bg-emerald-950/80 text-emerald-450 rounded-full border border-emerald-900 flex items-center justify-center mx-auto">
-                    <CheckCircle size={24} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black text-white uppercase tracking-wider">Â¡Cuenta Trial Creada Exitosamente!</h4>
-                    <p className="text-[10px] text-slate-400 font-semibold">Toda la configuraciÃ³n del contenido y fechas de duraciÃ³n estÃ¡n grabadas en la Base de Datos.</p>
-                  </div>
-                </div>
-
-                {/* Caja de Datos */}
-                <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-3.5 text-left">
-                  <div className="text-[10px] font-black uppercase text-amber-500 tracking-wider flex items-center gap-1 text-center justify-center">
-                    ğŸŒŸ Credenciales Xtream Codes listas para compartir
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    {/* Host */}
-                    <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1 relative group">
-                      <div className="text-[8px] font-black text-slate-400 uppercase">Host / DNS / URL</div>
-                      <div className="font-mono text-[11px] font-bold text-white truncate pr-6">{demoCreatedResult.host}</div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(demoCreatedResult.host);
-                          setCopiedField('host');
-                          setTimeout(() => setCopiedField(null), 2000);
-                          toast.success('DNS guardado en portapapeles');
-                        }}
-                        className="absolute top-3.5 right-3 text-slate-500 hover:text-white cursor-pointer transition-all"
-                        title="Copiar Host"
-                      >
-                        {copiedField === 'host' ? <Check size={14} className="text-emerald-400 animate-bounce" /> : <Copy size={13} />}
-                      </button>
-                    </div>
-
-                    {/* Port */}
-                    <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1 relative group">
-                      <div className="text-[8px] font-black text-slate-400 uppercase">Puerto de Enlace</div>
-                      <div className="font-mono text-[11px] font-bold text-white pr-6">{demoCreatedResult.port}</div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(demoCreatedResult.port);
-                          setCopiedField('port');
-                          setTimeout(() => setCopiedField(null), 2000);
-                          toast.success('Puerto guardado en portapapeles');
-                        }}
-                        className="absolute top-3.5 right-3 text-slate-500 hover:text-white cursor-pointer transition-all"
-                        title="Copiar Puerto"
-                      >
-                        {copiedField === 'port' ? <Check size={14} className="text-emerald-400 animate-bounce" /> : <Copy size={13} />}
-                      </button>
-                    </div>
-
-                    {/* Usuario */}
-                    <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1 relative group bg-gradient-to-r from-slate-900 to-slate-950">
-                      <div className="text-[8px] font-black text-indigo-400 uppercase">Usuario Xtream (LÃ­nea)</div>
-                      <div className="font-mono text-[11px] font-bold text-indigo-300 pr-6 break-all">{demoCreatedResult.username}</div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(demoCreatedResult.username);
-                          setCopiedField('user');
-                          setTimeout(() => setCopiedField(null), 2000);
-                          toast.success('Usuario guardado en portapapeles');
-                        }}
-                        className="absolute top-3.5 right-3 text-slate-500 hover:text-indigo-400 cursor-pointer transition-all"
-                        title="Copiar Usuario"
-                      >
-                        {copiedField === 'user' ? <Check size={14} className="text-emerald-400 animate-bounce" /> : <Copy size={13} />}
-                      </button>
-                    </div>
-
-                    {/* ContraseÃ±a */}
-                    <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1 relative group bg-gradient-to-r from-slate-900 to-slate-950">
-                      <div className="text-[8px] font-black text-indigo-400 uppercase">ContraseÃ±a Xtream</div>
-                      <div className="font-mono text-[11px] font-bold text-indigo-300 pr-6 break-all">{demoCreatedResult.password}</div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(demoCreatedResult.password);
-                          setCopiedField('pass');
-                          setTimeout(() => setCopiedField(null), 2000);
-                          toast.success('ContraseÃ±a guardada en portapapeles');
-                        }}
-                        className="absolute top-3.5 right-3 text-slate-500 hover:text-indigo-400 cursor-pointer transition-all"
-                        title="Copiar ContraseÃ±a"
-                      >
-                        {copiedField === 'pass' ? <Check size={14} className="text-emerald-400 animate-bounce" /> : <Copy size={13} />}
-                      </button>
-                    </div>
-
-                    {/* Playlist M3U */}
-                    <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl space-y-1 relative group col-span-1 sm:col-span-2">
-                      <div className="text-[8px] font-black text-slate-400 uppercase">Playlist Completa M3U (HLS/TS)</div>
-                      <div className="font-mono text-[10.5px] font-bold text-slate-300 pr-6 break-all flex items-center justify-between truncate bg-slate-950 border border-slate-850 p-1.5 rounded-lg">
-                        {demoCreatedResult.m3u_url}
-                      </div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(demoCreatedResult.m3u_url);
-                          setCopiedField('m3u');
-                          setTimeout(() => setCopiedField(null), 2000);
-                          toast.success('Lista M3U guardada en portapapeles');
-                        }}
-                        className="absolute top-3.5 right-3 text-slate-500 hover:text-white cursor-pointer transition-all p-1.5 bg-slate-800 rounded-lg animate-pulse"
-                        title="Copiar URL M3U"
-                      >
-                        {copiedField === 'm3u' ? <Check size={14} className="text-emerald-400 animate-bounce" /> : <Copy size={13} />}
-                      </button>
-                    </div>
-
-                    {/* ACCESO SMARTPHONE - QR Y ATAJO WHATSAPP */}
-                    <div className="bg-gradient-to-br from-indigo-950/40 to-slate-950/80 border border-indigo-900/30 p-3 rounded-xl col-span-1 sm:col-span-2 space-y-3">
-                      <div className="flex items-center gap-2 pb-1.5 border-b border-indigo-950">
-                        <Smartphone className="text-indigo-400 shrink-0" size={14} />
-                        <div>
-                          <span className="text-[9.5px] font-black uppercase text-indigo-200 tracking-wider block">
-                            ğŸ“± Copiar / Escanear para Celular & Smart TV
-                          </span>
-                          <span className="text-[8px] text-slate-400 block font-bold">
-                            Ideal para evitar escribir la larguÃ­sima URL en teclados de celulares u otros dispositivos.
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="flex flex-col md:flex-row items-center gap-4">
-                        {/* QR Code */}
-                        <div className="shrink-0 bg-white p-2 rounded-xl flex flex-col items-center gap-1.5 shadow-md">
-                          <img 
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(demoCreatedResult.m3u_url)}`} 
-                            alt="M3U QR Code" 
-                            className="size-[110px]"
-                            referrerPolicy="no-referrer"
-                          />
-                          <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-tight">QR de Playlist Directo</span>
-                        </div>
-                        
-                        {/* Explicativo y Copiado Directo */}
-                        <div className="space-y-2 flex-1 w-full text-left">
-                          <div className="bg-slate-900/50 border border-indigo-905 p-2 rounded-lg space-y-1">
-                            <span className="text-[8px] font-black text-indigo-400 uppercase block">ğŸ’¡ Tip Pro de Teclado:</span>
-                            <p className="text-[9px] text-slate-350 leading-relaxed font-semibold">
-                              Escribir la URL M3U entera es extenuante. Es mucho mejor **enviar el acceso directo a su WhatsApp** para que su cliente copie-pegue el enlace M3U directamente en el celular, o escanee este cÃ³digo QR para cargarlo rÃ¡pido.
-                            </p>
-                          </div>
-                          
-                          {/* Botones de acciÃ³n rÃ¡pida */}
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const m3uUrl = demoCreatedResult.m3u_url;
-                                navigator.clipboard.writeText(m3uUrl);
-                                setCopiedField('smart_m3u');
-                                setTimeout(() => setCopiedField(null), 2000);
-                                toast.success('M3U copiado para celulares');
-                              }}
-                              className="flex-1 bg-slate-900 hover:bg-slate-850 text-slate-300 font-bold py-1.5 px-2.5 rounded-lg text-[8.5px] uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer border border-slate-800 transition-all"
-                            >
-                              {copiedField === 'smart_m3u' ? (
-                                <><Check size={11} className="text-emerald-400" /> Â¡Copiado!</>
-                              ) : (
-                                <><Copy size={10} /> Copiar Solo M3U</>
-                              )}
-                            </button>
-                            
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const clientName = demoCreatedResult.nombre_completo || 'Cliente Trial';
-                                const userText = `ğŸ“º *TU ACCESO DIRECTO IPTV (TRIAL)* ğŸ“º\n\nHola *${clientName}*, aquÃ­ tienes tu acceso para conectar tu celular u otros dispositivos:\n\nğŸ”— *Enlace Directo Playlist M3U* (Copia este link completo y pÃ©galo en tu aplicaciÃ³n de IPTV):\n${demoCreatedResult.m3u_url}\n\nğŸ” *Acceso Xtream Codes* (Ideal para escribir mÃ¡s rÃ¡pido):\nğŸŒ Portal: *${demoCreatedResult.host}*\nğŸšª Puerto: *${demoCreatedResult.port}*\nğŸ”‘ Usuario: *${demoCreatedResult.username}*\nğŸ”’ Clave: *${demoCreatedResult.password}*`;
-                                
-                                const phoneNum = demoCreatedResult.celular || '';
-                                const cleanedPhone = phoneNum.replace(/\D/g, '');
-                                const waUrl = cleanedPhone 
-                                  ? `https://api.whatsapp.com/send?phone=${cleanedPhone}&text=${encodeURIComponent(userText)}`
-                                  : `https://api.whatsapp.com/send?text=${encodeURIComponent(userText)}`;
-                                
-                                window.open(waUrl, '_blank');
-                                toast.success('Abriendo WhatsApp para compartir...');
-                              }}
-                              className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black py-1.5 px-2.5 rounded-lg text-[8.5px] uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer transition-all"
-                            >
-                              <MessageSquare size={10} /> Enviar por WhatsApp
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Detalle informativo de expiraciÃ³n */}
-                  <div className="bg-slate-905 p-3 rounded-xl border border-slate-850 flex justify-between items-center text-[10px]">
-                    <span className="text-slate-400 font-semibold uppercase flex items-center gap-1.5">
-                      <Clock size={12} className="text-amber-500" />
-                      Lector de caducidad:
-                    </span>
-                    <span className="font-mono text-amber-500 font-extrabold bg-amber-950/30 px-2 py-0.5 rounded-md border border-amber-900/60 uppercase">
-                      Vence en {demoPackage === 'pkg-4h-3p' ? '4hs (3 pantallas)' : demoPackage === 'pkg-1h' ? '1hs' : demoPackage === 'pkg-3h' ? '3hs' : '6hs'} ({new Date(demoCreatedResult.expiration).toLocaleString('es-AR')})
-                    </span>
-                  </div>
-                </div>
-
-                {/* Acciones del final de la Demo */}
-                <div className="space-y-2">
-                  <button
-                    onClick={() => {
-                      const fullCredentialsText = `ğŸ“º CREDENCIALES IPTV DEMO ACTIVAS ğŸ“º\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\nğŸŒ Portal/Host: ${demoCreatedResult.host}\nğŸšª Puerto: ${demoCreatedResult.port}\nğŸ”‘ Usuario: ${demoCreatedResult.username}\nğŸ”’ ContraseÃ±a: ${demoCreatedResult.password}\nğŸ‘¥ Pantallas Soportadas: ${demoCreatedResult.screens}\nâ³ Vence: ${new Date(demoCreatedResult.expiration).toLocaleString('es-AR')}\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\nğŸ”— URL Lista M3U:\n${demoCreatedResult.m3u_url}`;
-                      navigator.clipboard.writeText(fullCredentialsText);
-                      setCopiedField('all_cred');
-                      setTimeout(() => setCopiedField(null), 2000);
-                      toast.success('Â¡Se copiaron las credenciales completas para tu cliente!');
-                    }}
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold py-3.5 rounded-2xl text-[10px] uppercase tracking-wider cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-indigo-950/50 hover:shadow-indigo-800/20 transition-all border border-indigo-500/20"
-                  >
-                    {copiedField === 'all_cred' ? (
-                      <>
-                        <Check size={16} className="text-emerald-400 animate-bounce" /> Â¡Copiaste todo de una vez!
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={16} /> Copiar todas las credenciales
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    onClick={() => setShowDemoAccountModal(false)}
-                    className="w-full bg-slate-800 hover:bg-slate-700 text-slate-350 font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-wider cursor-pointer transition-all"
-                  >
-                    Regresar a la Consola de Clientes
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* MODAL: RESPUESTA RÃPIDA DE PLANILLA CON VARIABLES (OPCIÃ“N C) */}
-      {/* ======================================================== */}
-      {showMessageModal && messageClient && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50 text-left animate-fade-in">
-          <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-3xl p-6 w-full max-w-xl shadow-2xl relative space-y-5 max-h-[90vh] overflow-y-auto">
-            <button
-              type="button"
-              onClick={() => {
-                setShowMessageModal(false);
-                setCustomizedMessageText('');
-                setSelectedTemplateId('');
-              }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer transition-colors"
-            >
-              <X size={18} />
-            </button>
-
-            <div>
-              <span className="text-[9px] font-black uppercase tracking-wider text-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 rounded-md">
-                âš¡ Respuesta RÃ¡pida (OpciÃ³n C)
-              </span>
-              <h3 className="text-base font-black text-slate-800 dark:text-white uppercase tracking-wider mt-2.5">
-                Enviar Respuesta RÃ¡pida a {messageClient.nombre_completo}
-              </h3>
-              <p className="text-[10px] text-slate-400 font-semibold mt-1">
-                Selecciona una plantilla rÃ¡pida de tu biblioteca. Sus variables dinÃ¡micas se adaptarÃ¡n de inmediato con los datos reales de este cliente.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {/* Seleccionar Plantilla */}
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-black uppercase text-slate-400 block tracking-wider">Elige una Plantilla Guardada</label>
-                <select
-                  value={selectedTemplateId}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedTemplateId(val);
-                    const tpl = quickReplies.find(qr => qr.id === val);
-                    if (tpl) {
-                      const replaced = replaceMessagePlaceholders(tpl.text, {
-                        ...messageClient,
-                        nombre_completo: messageClient.nombre_completo,
-                        username: messageClient.username_cuenta,
-                        password: messageClient.password_cuenta,
-                        fecha_vencimiento: messageClient.fecha_vencimiento,
-                        celular: messageClient.celular,
-                        m3u_url: messageClient.m3u_url || `http://mad.mvpl.uk:2095/get.php?username=${messageClient.username_cuenta}&password=${messageClient.password_cuenta}&type=m3u_plus`,
-                        host_completo: messageClient.url_panel_asignada || 'http://mad.mvpl.uk:2095',
-                        plan_venta: messageClient.id_plan_venta ? (salePlans.find(p => p.id === messageClient.id_plan_venta)?.name || messageClient.id_plan_venta) : 'Plan General'
-                      });
-                      setCustomizedMessageText(replaced);
-                      toast.success(`Plantilla "${tpl.name}" aplicada`);
-                    } else {
-                      setCustomizedMessageText('');
-                    }
-                  }}
-                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs p-3 rounded-xl font-bold text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="">-- Elige una plantilla rÃ¡pida --</option>
-                  {quickReplies.map(qr => (
-                    <option key={qr.id} value={qr.id}>
-                      {qr.name} ({qr.category.toUpperCase()})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Vista Previa / EdiciÃ³n Directa */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <label className="text-[9px] font-black uppercase text-slate-400 block tracking-wider">Mensaje a Enviar (Puedes editarlo libremente)</label>
-                  {customizedMessageText && (
-                    <span className="text-[8.5px] text-emerald-500 font-bold">âœ“ Variables Reemplazadas con Ã‰xito</span>
-                  )}
-                </div>
-                <textarea
-                  value={customizedMessageText}
-                  onChange={(e) => setCustomizedMessageText(e.target.value)}
-                  placeholder="Elige una plantilla arriba para visualizar su contenido..."
-                  className="w-full h-48 px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-y text-slate-800 dark:text-white"
-                />
-              </div>
-
-              {/* Botones de AcciÃ³n */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <button
-                  type="button"
-                  disabled={!customizedMessageText}
-                  onClick={() => {
-                    navigator.clipboard.writeText(customizedMessageText);
-                    toast.success('Â¡Mensaje copiado al portapapeles!');
-                  }}
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-extrabold text-[9.5px] uppercase py-2.5 rounded-xl tracking-wider cursor-pointer border dark:border-slate-800 flex justify-center items-center gap-2"
-                >
-                  ğŸ“‹ Copiar Texto RÃ¡pido
-                </button>
-
-                <button
-                  type="button"
-                  disabled={!customizedMessageText}
-                  onClick={() => {
-                    if (!customizedMessageText) return;
-                    const cleanPhone = messageClient.celular ? messageClient.celular.replace(/\D/g, '') : '';
-                    if (!cleanPhone) {
-                      toast.warning('El cliente no tiene celular guardado. Solo copiaremos el texto.');
-                      navigator.clipboard.writeText(customizedMessageText);
-                      return;
-                    }
-                    const url = `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(customizedMessageText)}`;
-                    window.open(url, '_blank');
-                    toast.success('Abriendo WhatsApp Web...');
-                    setShowMessageModal(false);
-                    setCustomizedMessageText('');
-                    setSelectedTemplateId('');
-                  }}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[9.5px] uppercase py-2.5 rounded-xl tracking-wider cursor-pointer shadow-lg flex justify-center items-center gap-2"
-                >
-                  ğŸ’¬ Enviar por WhatsApp
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* MODAL: FORMULARIO DE ALTA / EDICIÃ“N COMPLETA DE CLIENTES */}
-      {/* ======================================================== */}
-      {showFormModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in text-left">
-          <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-3xl p-6 w-full max-w-2xl shadow-2xl relative space-y-6 max-h-[90vh] overflow-y-auto">
-            
-            <button
-              type="button"
-              onClick={() => {
-                setShowFormModal(false);
-                setDemoCreatedResult(null);
-              }}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer transition-colors"
-            >
-              <X size={18} />
-            </button>
-
-            {/* ============== Vista 1: Credenciales Creadas (Para Demo o SuscripciÃ³n Ventas) ============== */}
-            {demoCreatedResult ? (
-              <div className="space-y-4">
-                <div className="text-center space-y-1 pb-2 border-b dark:border-slate-850">
-                  <div className="mx-auto w-12 h-12 bg-slate-900 border border-slate-850 dark:bg-slate-800 text-emerald-400 rounded-full flex items-center justify-center shadow-lg">
-                    <Check size={22} />
-                  </div>
-                  <h3 className="text-base font-black text-slate-800 dark:text-white uppercase tracking-wider mt-2">
-                    {demoCreatedResult.is_demo ? 'âš¡ Â¡Cuenta Demo IPTV Activada!' : 'ğŸŒŸ Â¡SuscripciÃ³n IPTV Activada!'}
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-medium">
-                    Credenciales procesadas con Ã©xito. Puedes editar el texto que se enviarÃ¡ al cliente directamente a continuaciÃ³n.
-                  </p>
-                </div>
-
-                {/* SELECTOR DE RESPUESTA RÃPIDA (OPCIÃ“N C) */}
-                <div className="bg-slate-50 dark:bg-slate-905 p-3.5 rounded-2xl border dark:border-slate-800 text-left space-y-1.5 shadow-sm">
-                  <label className="text-[9px] font-black uppercase text-indigo-400 block tracking-wider">
-                    âš¡ Seleccionar Plantilla de Respuesta RÃ¡pida (OpciÃ³n C)
-                  </label>
-                  <select
-                    value={selectedTemplateId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setSelectedTemplateId(val);
-                      const selectedTpl = quickReplies.find(qr => qr.id === val);
-                      if (selectedTpl) {
-                        const replaced = replaceMessagePlaceholders(selectedTpl.text, {
-                          ...demoCreatedResult,
-                          // Map variables for compat
-                          nombre_completo: demoCreatedResult.nombre_completo || 'Cliente Trial',
-                          celular: demoCreatedResult.celular || '',
-                          direccion_actual: demoCreatedResult.direccion_actual || '',
-                          url_panel_asignada: demoCreatedResult.host,
-                          id_plan_venta: demoCreatedResult.id_plan_venta
-                        });
-                        setEditableResultText(replaced);
-                        toast.success(`Plantilla "${selectedTpl.name}" aplicada con variables`);
-                      }
-                    }}
-                    className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs p-2.5 rounded-xl font-bold text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    title="Elige una plantilla rÃ¡pida para rellenar automÃ¡ticamente la leyenda de entrega"
-                  >
-                    <option value="">-- Usar formato por defecto --</option>
-                    {quickReplies.map(qr => (
-                      <option key={qr.id} value={qr.id}>{qr.name} ({qr.category.toUpperCase()})</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Leyenda totalmente editable */}
-                <div className="space-y-1.5 text-left">
-                  <label className="text-[9px] font-black uppercase text-slate-400 block tracking-wider">
-                    Leyenda de Credencial (Editable)
-                  </label>
-                  <textarea
-                    value={editableResultText}
-                    onChange={(e) => setEditableResultText(e.target.value)}
-                    className="w-full h-80 px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-mono font-medium rounded-2xl focus:outline-none focus:ring-1 focus:ring-slate-400 resize-y text-slate-800 dark:text-slate-100"
-                    placeholder="Escribe la plantilla de credenciales aquÃ­..."
-                  />
-                </div>
-
-                {/* Botones de AcciÃ³n */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(editableResultText);
-                      setCopiedField('all_cred');
-                      setTimeout(() => setCopiedField(null), 2000);
-                      toast.success('Â¡Leyenda copiada al portapapeles!');
-                    }}
-                    id="btn_copiar_credencial_resultado"
-                    className="w-full bg-slate-900 hover:bg-slate-850 text-white dark:bg-slate-800 dark:hover:bg-slate-700 font-extrabold py-3.5 rounded-2xl text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all border dark:border-slate-700 shadow-sm"
-                  >
-                    {copiedField === 'all_cred' ? (
-                      <>
-                        <Check size={15} className="text-emerald-400 animate-pulse" /> Â¡Copiado Exitosamente!
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={14} /> Copiar Leyenda de EnvÃ­o
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const phone = demoCreatedResult.celular || '';
-                      const cleanPhone = phone.replace(/\D/g, '');
-                      // Asegurarse de que si el nÃºmero es local argentino, contenga un cÃ³digo de paÃ­s internacional vÃ¡lido
-                      let finalPhone = cleanPhone;
-                      if (finalPhone && !finalPhone.startsWith('54')) {
-                        if (finalPhone.length === 10) {
-                          finalPhone = '54' + finalPhone;
-                        }
-                      }
-                      
-                      const waUrl = finalPhone
-                        ? `https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(editableResultText)}`
-                        : `https://api.whatsapp.com/send?text=${encodeURIComponent(editableResultText)}`;
-                      
-                      window.open(waUrl, '_blank');
-                      toast.success('Abriendo WhatsApp...');
-                    }}
-                    id="btn_whatsapp_credencial_resultado"
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3.5 rounded-2xl text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all shadow-sm"
-                  >
-                    <MessageSquare size={14} /> Enviar por WhatsApp
-                  </button>
-                </div>
-
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowFormModal(false);
-                      setDemoCreatedResult(null);
-                    }}
-                    className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white text-[10px] uppercase font-black tracking-widest cursor-pointer px-4 py-2"
-                  >
-                    Cerrar y Regresar
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* Vista 2: Formulario de CreaciÃ³n / EdiciÃ³n Completo desde cero */
-              <form onSubmit={handlePreSaveValidation} className="space-y-4">
-                <div className="border-b dark:border-slate-800 pb-3 flex justify-between items-center flex-wrap gap-2">
-                  <div>
-                    <h3 className="text-base font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
-                      {isEditingAccount ? 'âš™ï¸ Administrar Cuenta de Cliente' : 'âœ¨ Registrar Cliente IPTV Desde Cero'}
-                    </h3>
-                    <p className="text-[10px] text-slate-400 font-medium">
-                      Ingresa los datos del cliente, geolocaliza su ubicaciÃ³n, asigna el tipo de plan y gestiona su historial de notas.
-                    </p>
-                  </div>
-                  {!isEditingAccount && (
-                    <button
-                      type="button"
-                      onClick={handleFillWithRandomData}
-                      className="bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black py-2 px-3.5 rounded-xl text-[10px] uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-amber-500/10 cursor-pointer self-center transition-all"
-                    >
-                      ğŸ² Autocompletar Registros
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-4 max-w-xl mx-auto text-left">
-                  
-                  {/* SECCIÃ“N 1: INFORMACIÃ“N DE CONTACTO */}
-                  <div className="space-y-3.5">
-                    <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase border-b dark:border-slate-800 pb-1.5 flex items-center gap-1.5 flex-row">
-                      <User size={12} className="text-slate-500" /> InformaciÃ³n de Contacto del Cliente
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      {/* NOMBRE */}
-                      <div className="space-y-1 group relative">
-                        <label 
-                          title="Toca o pasa el mouse para ver indicaciones" 
-                          className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1 cursor-help hover:text-indigo-500 transition-colors select-none"
-                        >
-                          Nombre <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={accountForm.nombre}
-                          onChange={(e) => {
-                            const newNombre = e.target.value;
-                            setAccountForm({ 
-                              ...accountForm, 
-                              nombre: newNombre,
-                              nombre_completo: `${newNombre.trim()} ${accountForm.apellido.trim()}`.trim()
-                            });
-                          }}
-                          onBlur={(e) => {
-                            const formatted = capitalizeName(e.target.value);
-                            setAccountForm({
-                              ...accountForm,
-                              nombre: formatted,
-                              nombre_completo: `${formatted} ${accountForm.apellido.trim()}`.trim()
-                            });
-                          }}
-                          className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/15 text-slate-800 dark:text-white"
-                          placeholder="Ej. Juan"
-                        />
-                        <div className="absolute z-50 bottom-full left-0 mb-2 hidden group-hover:block w-72 bg-slate-900 dark:bg-slate-950 text-white text-[10px] font-medium p-2.5 rounded-xl shadow-xl border border-slate-800 leading-normal pointer-events-none">
-                          ğŸ’¡ Ingresa el nombre de pila o primer nombre del cliente para registrar su perfil.
-                        </div>
-                      </div>
-
-                      {/* APELLIDO */}
-                      <div className="space-y-1 group relative">
-                        <label 
-                          title="Toca o pasa el mouse para ver indicaciones" 
-                          className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1 cursor-help hover:text-indigo-500 transition-colors select-none"
-                        >
-                          Apellido <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={accountForm.apellido}
-                          onChange={(e) => {
-                            const newApellido = e.target.value;
-                            setAccountForm({ 
-                              ...accountForm, 
-                              apellido: newApellido,
-                              nombre_completo: `${accountForm.nombre.trim()} ${newApellido.trim()}`.trim()
-                            });
-                          }}
-                          onBlur={(e) => {
-                            const formatted = capitalizeName(e.target.value);
-                            setAccountForm({
-                              ...accountForm,
-                              apellido: formatted,
-                              nombre_completo: `${accountForm.nombre.trim()} ${formatted}`.trim()
-                            });
-                          }}
-                          className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/15 text-slate-800 dark:text-white"
-                          placeholder="Ej. PÃ©rez"
-                        />
-                        <div className="absolute z-50 bottom-full left-0 mb-2 hidden group-hover:block w-72 bg-slate-900 dark:bg-slate-950 text-white text-[10px] font-medium p-2.5 rounded-xl shadow-xl border border-slate-800 leading-normal pointer-events-none">
-                          ğŸ’¡ Ingresa el apellido familiar o paterno del cliente para complementar su perfil.
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* TELEFONO DE CONTACTO */}
-                    <div className="space-y-1 group relative">
-                      <label 
-                        title="Toca o pasa el mouse para ver indicaciones" 
-                        className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1 cursor-help hover:text-indigo-500 transition-colors select-none"
-                      >
-                        TelÃ©fono de Contacto <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        value={accountForm.celular}
-                        onChange={(e) => setAccountForm({ ...accountForm, celular: e.target.value })}
-                        placeholder="Ej. +54 9 383 4123456"
-                        className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/15 text-slate-800 dark:text-white"
-                      />
-                      <div className="absolute z-50 bottom-full left-0 mb-2 hidden group-hover:block w-72 bg-slate-900 dark:bg-slate-950 text-white text-[10px] font-medium p-2.5 rounded-xl shadow-xl border border-slate-800 leading-normal pointer-events-none">
-                        ğŸ’¡ NÃºmero con cÃ³digo de Ã¡rea (ej. +54 9 383...) para remitir de forma automatizada las credenciales y avisos de cobro por WhatsApp.
-                      </div>
-                    </div>
-
-                    {/* DIRECCION */}
-                    <div className="space-y-1 group relative">
-                      <div className="flex justify-between items-center">
-                        <label 
-                          title="Toca o pasa el mouse para ver indicaciones" 
-                          className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1 cursor-help hover:text-indigo-500 transition-colors select-none"
-                        >
-                          DirecciÃ³n del Cliente <span className="text-rose-500">*</span>
-                        </label>
-                        <button
-                          type="button"
-                          onClick={handleGetGPSLocation}
-                          className="text-[9px] font-black uppercase text-indigo-500 hover:text-indigo-400 flex items-center gap-0.5 cursor-pointer"
-                          title="Toca para geolocalizar de forma instantÃ¡nea usando las coordenadas GPS del navegador"
-                        >
-                          ğŸ“ Tomar GPS Vivo
-                        </button>
-                      </div>
-                      <input
-                        type="text"
-                        required
-                        value={accountForm.direccion_actual}
-                        onChange={(e) => setAccountForm({ ...accountForm, direccion_actual: e.target.value })}
-                        className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/15 text-slate-800 dark:text-white"
-                        placeholder="Ej. Calle Falsa 123 o pega Link de Google Maps"
-                      />
-                      <div className="absolute z-50 bottom-full left-0 mb-2 hidden group-hover:block w-72 bg-slate-900 dark:bg-slate-950 text-white text-[10px] font-medium p-2.5 rounded-xl shadow-xl border border-slate-800 leading-normal pointer-events-none">
-                        ğŸ’¡ Ingresa el domicilio para logÃ­stica de cobranza o copia el enlace de geolocalizaciÃ³n de Google Maps para acceso directo.
-                      </div>
-                      
-                      {/* DetecciÃ³n amigable de Google Maps */}
-                      {accountForm.direccion_actual.trim() && (
-                        <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border dark:border-slate-800 text-[9px]">
-                          {(() => {
-                            const val = accountForm.direccion_actual.trim();
-                            const isMaps = val.toLowerCase().includes('maps.google') || val.toLowerCase().includes('google.com/maps') || val.toLowerCase().includes('maps.app.goo.gl');
-                            return (
-                              <>
-                                <span className="flex items-center gap-1 text-slate-500 font-extrabold flex-row">
-                                  {isMaps ? (
-                                    <span className="text-emerald-500 flex items-center gap-1 flex-row">ğŸŸ¢ Enlace GPS Maps Detectado</span>
-                                  ) : (
-                                    <span className="text-slate-400">ğŸ“„ DirecciÃ³n en Formato Texto</span>
-                                  )}
-                                </span>
-                                {isMaps && (
-                                  <a
-                                    href={val}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-indigo-500 font-bold hover:underline flex items-center gap-0.5"
-                                  >
-                                    Probar Mapa <ExternalLink size={10} />
-                                  </a>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* SECCIÃ“N 2: MEMBRESÃA TV DIGITAL */}
-                  <div className="space-y-3.5 pt-4 border-t dark:border-slate-800">
-                    <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase pb-1 flex items-center gap-1.5 flex-row border-b dark:border-slate-800">
-                      <Activity size={12} className="text-slate-500" /> MembresÃ­a TV Digital
-                    </div>
-
-                    {isEditingAccount ? (
-                      /* Vista de solo lectura para ediciÃ³n */
-                      <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Detalles de la LÃ­nea Activa</span>
-                          <span className={`text-[8px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-                            accountForm.is_demo 
-                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-955/40 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30'
-                              : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-955/40 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/30'
-                          }`}>
-                            {accountForm.is_demo ? 'âš¡ Cuenta Demo' : 'ğŸ’ Cuenta VIP'}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3.5">
-                          {/* Plan Asociado */}
-                          <div className="space-y-1">
-                            <span className="text-[9px] font-black uppercase text-slate-400 block">Plan de SuscripciÃ³n</span>
-                            <div className="px-3 py-2 bg-white dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 truncate">
-                              {salePlans.find(p => p.id === accountForm.id_plan_venta)?.name || (accountForm.is_demo ? 'Demo de Venta Temporal' : 'Personalizado')}
-                            </div>
-                          </div>
-
-                          {/* Vencimiento */}
-                          <div className="space-y-1">
-                            <span className="text-[9px] font-black uppercase text-slate-400 block">PrÃ³ximo Vencimiento</span>
-                            <div className="px-3 py-2 bg-white dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300">
-                              {accountForm.fecha_vencimiento 
-                                ? new Date(accountForm.fecha_vencimiento).toLocaleDateString('es-AR') 
-                                : 'Sin fecha'}
-                            </div>
-                          </div>
-
-                          {/* Credenciales Xtream (Usuario) */}
-                          <div className="space-y-1">
-                            <span className="text-[9px] font-black uppercase text-slate-400 block">Usuario Xtream (XC)</span>
-                            <div className="px-3 py-2 bg-white dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                              {accountForm.username}
-                            </div>
-                          </div>
-
-                          {/* Credenciales Xtream (ContraseÃ±a) */}
-                          <div className="space-y-1">
-                            <span className="text-[9px] font-black uppercase text-slate-400 block">ContraseÃ±a Xtream</span>
-                            <div className="px-3 py-2 bg-white dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400">
-                              {accountForm.password}
-                            </div>
-                          </div>
-
-                          {/* Pantallas Autorizadas */}
-                          <div className="space-y-1 col-span-2">
-                            <span className="text-[9px] font-black uppercase text-slate-400 block">LÃ­mite de Pantallas Autorizadas</span>
-                            <div className="px-3 py-2 bg-white dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 flex justify-between items-center">
-                              <span>ğŸ–¥ï¸ {accountForm.limite_pantallas || 1} pantallas simultÃ¡neas</span>
-                              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-900 px-1.5 py-0.5 rounded-lg border dark:border-slate-800">ğŸ”’ Solo Lectura</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <p className="text-[8.5px] text-slate-400 leading-normal font-medium italic pt-1">
-                          ğŸ”’ Las credenciales de conexiÃ³n, el plan y las pantallas autorizadas no pueden ser editados en el formulario de contacto para evitar errores de sincronizaciÃ³n con el panel XC.
-                        </p>
-                      </div>
-                    ) : (
-                      /* Vista interactiva para nuevas altas */
-                      <>
-                        {/* Botones de SelecciÃ³n Directa (Demo o VIP) */}
-                        <div className="space-y-2 group relative">
-                          <div className="grid grid-cols-2 gap-3">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAccountForm({ 
-                                  ...accountForm, 
-                                  is_demo: true,
-                                  id_plan_venta: '' // Resetear plan seleccionado para forzar nueva selecciÃ³n
-                                });
-                              }}
-                              className={`py-3 px-4 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition-all cursor-pointer border ${
-                                accountForm.is_demo
-                                  ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white'
-                              }`}
-                            >
-                              âš¡ DEMO
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAccountForm({ 
-                                  ...accountForm, 
-                                  is_demo: false,
-                                  id_plan_venta: '' // Resetear plan seleccionado para forzar nueva selecciÃ³n
-                                });
-                              }}
-                              className={`py-3 px-4 rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition-all cursor-pointer border ${
-                                !accountForm.is_demo
-                                  ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white'
-                              }`}
-                            >
-                              ğŸ’ VIP
-                            </button>
-                          </div>
-                          <div className="absolute z-50 bottom-full left-0 mb-2 hidden group-hover:block w-72 bg-slate-900 dark:bg-slate-950 text-white text-[10px] font-medium p-2.5 rounded-xl shadow-xl border border-slate-800 leading-normal pointer-events-none">
-                            ğŸ’¡ Elige si el cliente recibe una cuenta de prueba temporal (Demo) o un servicio premium VIP recurrente y activo.
-                          </div>
-                        </div>
-
-                        {/* Muestra catÃ¡logo de planes minoristas filtrados */}
-                        <div className="space-y-1.5 group relative">
-                          <label 
-                            title="Toca o pasa el mouse para ver indicaciones" 
-                            className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1 cursor-help hover:text-indigo-500 transition-colors select-none"
-                          >
-                            {accountForm.is_demo ? 'Selecciona tu Demo de Venta' : 'Selecciona tu Plan VIP Minorista'} <span className="text-rose-500">*</span>
-                          </label>
-
-                          {accountForm.is_demo ? (
-                            <>
-                              {/* Filtrar planes de venta que contengan la palabra 'demo' */}
-                              {(() => {
-                                const demoPlans = salePlans.filter(p => (p.name || '').toLowerCase().includes('demo'));
-                                if (demoPlans.length > 0) {
-                                  return (
-                                    <select
-                                      value={accountForm.id_plan_venta}
-                                      onChange={(e) => {
-                                        const pId = e.target.value;
-                                        const targetPlan = salePlans.find(plan => plan.id === pId);
-                                        if (targetPlan) {
-                                          const limitDate = new Date();
-                                          limitDate.setMonth(limitDate.getMonth() + (targetPlan.months || 1));
-                                          setAccountForm({
-                                            ...accountForm,
-                                            id_plan_venta: targetPlan.id,
-                                            id_plan_proveedor: targetPlan.provider_plan_id || '',
-                                            limite_pantallas: targetPlan.screens || 2,
-                                            limite_pantallas_api: targetPlan.screens_api || targetPlan.screens || 1,
-                                            fecha_vencimiento: limitDate.toISOString().substring(0, 10)
-                                          });
-                                        } else {
-                                          setAccountForm({ ...accountForm, id_plan_venta: pId });
-                                        }
-                                      }}
-                                      className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/15 text-slate-800 dark:text-white"
-                                    >
-                                      <option value="">-- Seleccionar Demo del CatÃ¡logo --</option>
-                                      {demoPlans.map(plan => (
-                                        <option key={plan.id} value={plan.id}>
-                                          {plan.name} (${plan.price} ARS â€¢ {plan.screens || 2} disp.)
-                                        </option>
-                                      ))}
-                                    </select>
-                                  );
-                                } else {
-                                  // Fallback de contingencia si no tiene planes demo cargados aÃºn
-                                  return (
-                                    <div className="space-y-2">
-                                      <select
-                                        value={accountForm.demo_package}
-                                        onChange={(e) => setAccountForm({ ...accountForm, demo_package: e.target.value as any })}
-                                        className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/15 text-slate-800 dark:text-white"
-                                      >
-                                        <option value="pkg-1h">Demo 1 Hora (0 crÃ©ditos)</option>
-                                        <option value="pkg-3h">Demo 3 Horas (0 crÃ©ditos)</option>
-                                        <option value="pkg-6h">Demo 6 Horas (0 crÃ©ditos)</option>
-                                        <option value="pkg-4h-3p">Demo 4 Horas - 3 Pantallas (0 crÃ©ditos)</option>
-                                      </select>
-                                      <p className="text-[8px] text-amber-500 font-bold leading-normal">
-                                        ğŸ’¡ No se encontraron planes minoristas con la palabra "demo". Mostrando paquetes temporales generados por defecto.
-                                      </p>
-                                    </div>
-                                  );
-                                }
-                              })()}
-                            </>
-                          ) : (
-                            <select
-                              value={accountForm.id_plan_venta}
-                              required
-                              onChange={(e) => {
-                                const pId = e.target.value;
-                                const targetPlan = salePlans.find(p => p.id === pId);
-                                if (targetPlan) {
-                                  const limitDate = new Date();
-                                  limitDate.setMonth(limitDate.getMonth() + (targetPlan.months || 1));
-                                  setAccountForm({
-                                    ...accountForm,
-                                    id_plan_venta: targetPlan.id,
-                                    id_plan_proveedor: targetPlan.provider_plan_id || '',
-                                    limite_pantallas: targetPlan.screens || 2,
-                                    limite_pantallas_api: targetPlan.screens_api || targetPlan.screens || 3,
-                                    fecha_vencimiento: limitDate.toISOString().substring(0, 10)
-                                  });
-                                } else {
-                                  setAccountForm({
-                                    ...accountForm,
-                                    id_plan_venta: pId
-                                  });
-                                }
-                              }}
-                              className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/15 text-slate-800 dark:text-white"
-                            >
-                              <option value="">-- Seleccionar Plan VIP Minorista --</option>
-                              {salePlans
-                                .filter(plan => !(plan.name || '').toLowerCase().includes('demo'))
-                                .map(plan => (
-                                  <option key={plan.id} value={plan.id}>
-                                    {plan.name} (${plan.price} ARS â€¢ {plan.screens || 2} disp.)
-                                  </option>
-                                ))}
-                            </select>
-                          )}
-                          <div className="absolute z-50 bottom-full left-0 mb-2 hidden group-hover:block w-72 bg-slate-900 dark:bg-slate-950 text-white text-[10px] font-medium p-2.5 rounded-xl shadow-xl border border-slate-800 leading-normal pointer-events-none">
-                            ğŸ’¡ Selecciona uno de tus planes minoristas definidos. El sistema cargarÃ¡ automÃ¡ticamente el valor y la duraciÃ³n correspondientes.
-                          </div>
-                        </div>
-
-                        {/* ExpiraciÃ³n predecible de un vistazo */}
-                        <div className="pt-1 select-none">
-                          {accountForm.is_demo ? (
-                            (() => {
-                              const h = { 'pkg-1h': 1, 'pkg-3h': 3, 'pkg-6h': 6, 'pkg-4h-3p': 4 }[accountForm.demo_package] || 1;
-                              const estDate = new Date(Date.now() + h * 60 * 60 * 1000);
-                              return (
-                                <div className="bg-amber-500/5 text-amber-600 p-2 rounded-xl text-[9px] font-mono leading-relaxed border border-amber-500/10 flex items-center gap-1.5 justify-between">
-                                  <span className="font-bold uppercase">DuraciÃ³n de Demo Estimada:</span>
-                                  <span className="font-extrabold">{estDate.toLocaleString('es-AR')}</span>
-                                </div>
-                              );
-                            })()
-                          ) : (
-                            (() => {
-                              const p = salePlans.find(plan => plan.id === accountForm.id_plan_venta);
-                              const months = p ? (p.months || 1) : 1;
-                              const estDate = new Date();
-                              estDate.setMonth(estDate.getMonth() + months);
-                              return (
-                                <div className="bg-indigo-500/5 text-indigo-500 p-2 rounded-xl text-[9px] font-mono leading-relaxed border border-indigo-500/10 flex items-center gap-1.5 justify-between">
-                                  <span className="font-bold uppercase flex-1 truncate">Vencimiento Estimado ({months} {months === 1 ? 'Mes' : 'Meses'}):</span>
-                                  <span className="font-extrabold">{estDate.toLocaleDateString('es-AR')} ({months * 30} dÃ­as)</span>
-                                </div>
-                              );
-                            })()
-                          )}
-                        </div>
-
-                        {/* RESUMEN DE BENEFICIOS DEL PLAN (VISTA REORDENADA, COMPACTA Y SIN DESGLOSE FINANCIERO) */}
-                        {(() => {
-                          const selPlan = salePlans.find(p => p.id === accountForm.id_plan_venta);
-                          if (!selPlan && !accountForm.is_demo) return null;
-                          
-                          const screensCount = selPlan ? selPlan.screens || 1 : (accountForm.demo_package === 'pkg-4h-3p' ? 3 : 1);
-                          const planPrice = selPlan ? selPlan.price : 0;
-                          
-                          return (
-                            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3.5">
-                              <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase flex items-center gap-1.5 border-b dark:border-slate-850 pb-2">
-                                <Smartphone size={12} className="text-indigo-500" /> Resumen de Beneficios del Plan
-                              </div>
-                              
-                              <div className="grid grid-cols-2 gap-4">
-                                {/* PANTALLAS INCLUIDAS (LÃ­mite del Plan Minorista) */}
-                                <div className="space-y-1 group relative">
-                                  <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1 select-none">
-                                    Dispositivos / Pantallas
-                                  </label>
-                                  <div className="px-3 py-2 bg-white dark:bg-slate-950 border border-slate-150 dark:border-slate-850 rounded-xl text-xs font-black text-slate-800 dark:text-white flex items-center gap-1.5 h-10 select-none">
-                                    ğŸ–¥ï¸ {screensCount} {screensCount === 1 ? 'Pantalla' : 'Pantallas'} Autorizadas
-                                  </div>
-                                  <div className="absolute z-50 bottom-full left-0 mb-2 hidden group-hover:block w-72 bg-slate-900 dark:bg-slate-950 text-white text-[10px] font-medium p-2.5 rounded-xl shadow-xl border border-slate-800 leading-normal pointer-events-none">
-                                    ğŸ’¡ Cantidad de pantallas simultÃ¡neas preconfiguradas en el plan minorista seleccionado. Solo lectura.
-                                  </div>
-                                </div>
-                                
-                                {/* PRECIO FINAL DE VENTA */}
-                                <div className="space-y-1 group relative">
-                                  <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1 select-none">
-                                    Importe de Venta
-                                  </label>
-                                  <div className="px-3 py-2 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-950 rounded-xl text-xs font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 h-10 select-none">
-                                    ğŸ’° ${planPrice.toLocaleString('es-AR')} ARS Final
-                                  </div>
-                                  <div className="absolute z-50 bottom-full left-0 mb-2 hidden group-hover:block w-72 bg-slate-900 dark:bg-slate-950 text-white text-[10px] font-medium p-2.5 rounded-xl shadow-xl border border-slate-800 leading-normal pointer-events-none">
-                                    ğŸ’¡ Monto total de venta minorista al cliente por este perÃ­odo. No incluye costos internos.
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </>
-                    )}
-
-                    {/* URL Portal DNS & ESTADO SUSCRIPCION (OCULTOS BAJO LA PETICION DEL USUARIO) */}
-                    <div className="hidden">
-                      <input
-                        type="text"
-                        value={accountForm.url_panel_asignada}
-                        onChange={(e) => setAccountForm({ ...accountForm, url_panel_asignada: e.target.value })}
-                      />
-                      <select
-                        value={accountForm.estado}
-                        onChange={(e) => setAccountForm({ ...accountForm, estado: e.target.value })}
-                      >
-                        <option value="Activo">ğŸŸ¢ ACTIVO (LIVE)</option>
-                        <option value="Inactivo">ğŸ”´ INACTIVO (BAN)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* SECCIÃ“N 3: BITÃCORA / NOTAS DEL CLIENTE (ABAJO) */}
-                  <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-3xl border border-slate-100 dark:border-slate-850 space-y-3">
-                    <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase flex items-center justify-between pb-1 border-b dark:border-slate-850 flex-row">
-                      <span className="flex items-center gap-1.5 flex-row">
-                        <FileText size={12} className="text-amber-500" /> BitÃ¡cora / Notas del Cliente
-                      </span>
-                      <span className="text-[8px] px-2 py-0.5 bg-slate-200 dark:bg-slate-805 text-slate-500 rounded-full font-black">
-                        {(accountForm.bitacora_comentarios || []).filter((note: any) => !note.is_system).length} Registros
-                      </span>
-                    </div>
-
-                    {/* Cuadro integrado para agregar notas */}
-                    <div className="flex gap-2.5">
-                      <textarea
-                        value={newNoteText}
-                        onChange={(e) => setNewNoteText(e.target.value)}
-                        placeholder="AÃ±ade un suceso o comentario..."
-                        className="flex-1 px-2.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-medium rounded-xl focus:outline-none max-h-20 text-slate-800 dark:text-white"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddNoteToForm}
-                        className="px-3 bg-slate-900 text-white dark:bg-slate-800 dark:hover:bg-slate-700 rounded-xl text-[10px] uppercase font-black tracking-wider hover:bg-slate-850 cursor-pointer self-stretch flex items-center justify-center border dark:border-slate-700 hover:border-slate-800 transition-all"
-                      >
-                        + Nota
-                      </button>
-                    </div>
-
-                    {/* Listado ChronolÃ³gico de Comentarios */}
-                    <div className="max-h-36 overflow-y-auto space-y-2.5 pr-1">
-                      {(() => {
-                        const visibleNotes = (accountForm.bitacora_comentarios || []).filter((note: any) => !note.is_system);
-                        return visibleNotes.length > 0 ? (
-                          visibleNotes.map((note: any, visibleIdx: number) => {
-                            const originalIndex = accountForm.bitacora_comentarios.findIndex((b: any) => b.date === note.date && b.text === note.text);
-                            return (
-                              <div key={visibleIdx} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-850 p-2.5 rounded-2xl relative group shadow-sm">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveNoteFromForm(originalIndex !== -1 ? originalIndex : visibleIdx)}
-                                  className="absolute top-2 right-2 text-rose-500 hover:text-rose-600 bg-rose-50 hover:bg-rose-100 dark:bg-rose-955/20 p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                  title="Eliminar este suceso"
-                                >
-                                  <Trash2 size={10} />
-                                </button>
-                                
-                                <p className="text-[10.5px] pr-5 font-bold leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{note.text}</p>
-                                
-                                <div className="text-[8.5px] text-slate-400 mt-1 font-mono font-black border-t dark:border-slate-850/50 pt-1 flex items-center justify-between">
-                                  <span className="flex items-center gap-0.5">
-                                    ğŸ“… {new Date(note.date).toLocaleString('es-AR')}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <div className="text-center py-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-850 rounded-2xl">
-                            <p className="text-[10px] text-slate-400 font-medium">No hay sucesos registrados. AÃ±ade tu primera nota para crear la bitÃ¡cora de este cliente.</p>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-3 border-t dark:border-slate-850">
-                  <button
-                    type="submit"
-                    className="flex-1 bg-slate-900 hover:bg-slate-850 dark:bg-indigo-650 dark:hover:bg-indigo-600 text-white font-extrabold py-3.5 rounded-2xl text-[10px] uppercase tracking-wider cursor-pointer shadow-md transition-all flex items-center justify-center gap-1"
-                  >
-                    ğŸš€ {isEditingAccount ? 'Sincronizar y Modificar Cliente en Base de Datos' : 'REGISTRAR ALTA DEL CLIENTE'}
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowFormModal(false);
-                      setDemoCreatedResult(null);
-                    }}
-                    className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold py-3.5 px-6 rounded-2xl text-[10px] uppercase tracking-wider cursor-pointer"
-                  >
-                    Salir
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* VENTANA FLOTANTE DE VALIDACIÃ“N (CAMPOS FALTANTES) */}
-      {/* ======================================================== */}
-      {showValidationModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[99] animate-fade-in text-left">
-          <div className="bg-white dark:bg-slate-950 border-2 border-rose-500/30 dark:border-rose-500/20 rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
-            <div className="text-center space-y-2">
-              <div className="mx-auto w-12 h-12 bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 rounded-full flex items-center justify-center">
-                <AlertTriangle size={24} />
-              </div>
-              <h3 className="text-base font-black text-slate-800 dark:text-white uppercase tracking-wider">
-                âš ï¸ CAMPOS FALTANTES DETECTADOS
-              </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-                Para poder registrar el alta del cliente, debes completar los siguientes campos obligatorios del formulario:
-              </p>
-            </div>
-
-            <div className="bg-rose-50 dark:bg-rose-950/20 p-4 rounded-2xl border border-rose-100 dark:border-rose-950/20 text-xs font-bold text-rose-700 dark:text-rose-400 space-y-1.5 font-sans">
-              {validationMissingFields.map((field, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 bg-rose-500 rounded-full shrink-0" />
-                  <span>{field}</span>
-                </div>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowValidationModal(false)}
-              className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-extrabold py-3.5 rounded-2xl text-[10px] uppercase tracking-wider cursor-pointer shadow-md transition-all text-center"
-            >
-              Cerrar y Completar Datos
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* VENTANA FLOTANTE DE CONFIRMACIÃ“N (RESUMEN EN 1 PANTALLAZO) */}
-      {/* ======================================================== */}
-      {showConfirmSaveModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[98] animate-fade-in text-left">
-          <div className="bg-white dark:bg-slate-950 border-2 border-indigo-500/20 dark:border-indigo-500/10 rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-4">
-            <div className="text-center space-y-1.5">
-              <div className="mx-auto w-12 h-12 bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center">
-                <CheckCircle size={24} />
-              </div>
-              <h3 className="text-base font-black text-slate-800 dark:text-white uppercase tracking-wider">
-                ğŸ™‹â€â™‚ï¸ Â¿CONFIRMAR DATOS DE ALTA?
-              </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-                Por favor, verifica que los siguientes datos de registro sean totalmente correctos antes de proceder:
-              </p>
-            </div>
-
-            {/* CUADRO RESUMEN COMPACTO DE UN SOLO PANTALLAZO */}
-            <div className="bg-slate-50 dark:bg-slate-900 border dark:border-slate-850 p-4 rounded-2xl space-y-2.5">
-              <div className="flex justify-between items-center text-[11px] border-b dark:border-slate-850 pb-1.5">
-                <span className="text-slate-400 font-bold uppercase tracking-wider">ğŸ‘¤ Cliente:</span>
-                <span className="font-extrabold text-slate-800 dark:text-white text-right">{accountForm.nombre_completo}</span>
-              </div>
-
-              <div className="flex justify-between items-center text-[11px] border-b dark:border-slate-850 pb-1.5">
-                <span className="text-slate-400 font-bold uppercase tracking-wider">ğŸ“± Celular AR:</span>
-                <span className="font-mono font-extrabold text-indigo-500 text-right">{accountForm.celular}</span>
-              </div>
-
-              <div className="flex justify-between items-center text-[11px] border-b dark:border-slate-850 pb-1.5">
-                <span className="text-slate-400 font-bold uppercase tracking-wider">ğŸ“ UbicaciÃ³n GPS / Direc:</span>
-                <span className="font-bold text-slate-600 dark:text-slate-350 text-right max-w-[240px] truncate" title={accountForm.direccion_actual}>
-                  {accountForm.direccion_actual}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center text-[11px] border-b dark:border-slate-850 pb-1.5">
-                <span className="text-slate-400 font-bold uppercase tracking-wider">ğŸ“‹ Modalidad / Plan:</span>
-                <span className="font-extrabold text-emerald-500 dark:text-emerald-400 uppercase text-right">
-                  {accountForm.is_demo ? 'ğŸŒŸ demo de prueba' : 'ğŸ’¼ minorista comercial'}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center text-[11px] pb-1.5">
-                <span className="text-slate-400 font-bold uppercase tracking-wider font-mono">ğŸ“¦ Paquete de Plan:</span>
-                <span className="font-mono font-extrabold text-slate-700 dark:text-slate-200 text-right">
-                  {accountForm.is_demo 
-                    ? (accountForm.demo_package === 'pkg-1h' ? 'Demo 1 Hora' : accountForm.demo_package === 'pkg-3h' ? 'Demo 3 Horas' : accountForm.demo_package === 'pkg-6h' ? 'Demo 6 Horas' : 'Demo 4 Horas - 3 Pantallas')
-                    : (salePlans.find(plan => plan.id === accountForm.id_plan_venta)?.name || 'Minorista Premium')}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={confirmAndSaveAccount}
-                disabled={isSavingIptv}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:text-indigo-300 font-extrabold py-3.5 rounded-2xl text-[10px] uppercase tracking-wider cursor-pointer shadow-md transition-all text-center flex items-center justify-center gap-1.5"
-              >
-                {isSavingIptv ? (
-                  <>
-                    <span className="size-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" /> PROCESANDO...
-                  </>
-                ) : (
-                  <>ğŸš€ SÃ, REGISTRAR ALTA</>
-                )}
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => setShowConfirmSaveModal(false)}
-                className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold py-3.5 px-5 rounded-2xl text-[10px] uppercase tracking-wider cursor-pointer transition-all"
-              >
-                Corregir Datos
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* MODAL 2: FORMULARIO PLANES DE FINANZAS (PROVEEDOR/VENTA) */}
-      {/* ======================================================== */}
-      {editingPlanType && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-slate-950 border dark:border-slate-800 rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto pr-2 shadow-2xl relative space-y-4 custom-scrollbar">
-            <button
-              onClick={() => setEditingPlanType(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <X size={18} />
-            </button>
-
-            <div className="border-b dark:border-slate-850 pb-2">
-              <h3 className="text-sm font-black text-slate-850 dark:text-white uppercase tracking-wider">
-                {editingPlanId ? 'Modificar Plan' : 'Registrar Plan / Combo'}
-              </h3>
-              <p className="text-[10px] text-slate-400 font-medium">
-                {editingPlanType === 'provider' 
-                  ? 'ConfiguraciÃ³n del paquete oficial del panel proveedor.' 
-                  : 'Configura tus tÃ©rminos de venta minorista al cliente final.'}
-              </p>
-            </div>
-
-            <form onSubmit={handleSavePlan} className="space-y-4">
-              {/* SI REGISTRAMOS UN PLAN MINORISTA */}
-              {editingPlanType === 'sale' && (() => {
-                const selPlan = planForm.provider_plan_id ? providerPlans.find(p => p.id === planForm.provider_plan_id) || null : null;
-                const limits = getSelectedPlanConnectionsLimits(selPlan);
-                const selectedConnsApi = planForm.screens_api !== '' ? Number(planForm.screens_api) : (selPlan ? selPlan.max_connections || selPlan.screens || 1 : 1);
-                const computedCredits = calculateApiCreditCost(selPlan, selectedConnsApi);
-                const costArs = selPlan ? getPlanCostInArs(computedCredits, selPlan.provider_cost_id) : 0;
-                
-                // CÃ¡lculos de rentabilidad interactivos
-                const precioVenta = Number(planForm.value) || 0;
-                const comisionVenta = Number(planForm.comision) || 0;
-                const gananciaEstimada = precioVenta - costArs - comisionVenta;
-                const roiPercent = costArs > 0 ? Math.round((gananciaEstimada / costArs) * 100) : 100;
-                
-                return (
-                  <>
-                    {/* Vincular a MÃ³dulo del Proveedor */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Vincular a MÃ³dulo del Proveedor (CatÃ¡logo API)</label>
-                      <select
-                        value={planForm.provider_plan_id || ''}
-                        onChange={(e) => {
-                          const selectedId = e.target.value;
-                          const matchedProv = providerPlans.find(p => p.id === selectedId);
-                          if (matchedProv) {
-                            const matchedLimits = getSelectedPlanConnectionsLimits(matchedProv);
-                            const defaultScreens = matchedLimits.min;
-                            const calculatedTokens = calculateApiCreditCost(matchedProv, defaultScreens);
-                            setPlanForm({
-                              ...planForm,
-                              provider_plan_id: selectedId,
-                              months: matchedProv.months,
-                              screens: defaultScreens,
-                              tokens: calculatedTokens,
-                              name: `${matchedProv.name} (Venta)`,
-                              screens_api: defaultScreens,
-                              comision: planForm.comision || ''
-                            });
-                            toast.info(`Datos del catÃ¡logo API importados: "${matchedProv.name}"`);
-                          } else {
-                            setPlanForm({
-                              ...planForm,
-                              provider_plan_id: '',
-                              screens_api: 1,
-                              screens: 1,
-                              tokens: 1
-                            });
-                          }
-                        }}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800"
-                      >
-                        <option value="">-- CreaciÃ³n Libre (Sin Vincular) --</option>
-                        {providerPlans.map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({p.months === 0 ? 'Demo' : `${p.months}m`} - {p.tokens} Token/s)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* ABAJO DEL DESPLEGABLE DE VINCULAR: Con cuantas pantallas debe crearse en el Panel XC */}
-                    {selPlan && (
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-slate-400 block">Conexiones FÃ­sicas XC/XUI (LÃ­mite API de Proveedor)</label>
-                        <select
-                          value={planForm.screens_api || ''}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            const updatedTokens = calculateApiCreditCost(selPlan, val);
-                            setPlanForm({ 
-                              ...planForm, 
-                              screens_api: val,
-                              screens: val,
-                              tokens: updatedTokens
-                            });
-                          }}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 text-slate-900 dark:text-white"
-                        >
-                          {limits.options.map((opt: number) => {
-                            const optCredits = calculateApiCreditCost(selPlan, opt);
-                            const optCostArs = selPlan ? getPlanCostInArs(optCredits, selPlan.provider_cost_id) : 0;
-                            return (
-                              <option key={opt} value={opt}>
-                                {opt} {opt === 1 ? 'PANTALLA' : 'PANTALLAS'} (COSTO: {optCredits} {optCredits === 1 ? 'CRÃ‰DITO' : 'CRÃ‰DITOS'} - ${optCostArs.toLocaleString('es-AR')} ARS)
-                              </option>
-                            );
-                          })}
-                        </select>
-                        <p className="text-[8px] text-slate-400 leading-normal">
-                          Configura la cantidad de conexiones fÃ­sicas reales con las que se registrarÃ¡ el usuario en la API de XUI (XC).
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Nombre Descriptivo de Venta */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Nombre Descriptivo de Venta</label>
-                      <input
-                        type="text"
-                        placeholder="Ej. Combo Mensual - 1 Dispositivo"
-                        value={planForm.name}
-                        onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 text-slate-900 dark:text-white"
-                      />
-                    </div>
-
-                    {/* CategorÃ­a y ID de CategorÃ­a del Plan */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-slate-400 block">ID de CategorÃ­a</label>
-                        <select
-                          value={planForm.categoria_id || 'vip'}
-                          onChange={(e) => {
-                            const catId = e.target.value as 'demo' | 'vip' | 'xxx';
-                            let suggestedName = '';
-                            if (catId === 'demo') suggestedName = 'Demos Gratuitas';
-                            if (catId === 'vip') suggestedName = 'MembresÃ­as VIP';
-                            if (catId === 'xxx') suggestedName = 'Paquetes Especiales';
-                            setPlanForm({ 
-                              ...planForm, 
-                              categoria_id: catId,
-                              categoria_nombre: planForm.categoria_nombre || suggestedName
-                            });
-                          }}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 text-slate-900 dark:text-white"
-                        >
-                          <option value="demo">ğŸ Demo (Gratuito)</option>
-                          <option value="vip">ğŸ’ VIP (Venta Regular)</option>
-                          <option value="xxx">ğŸ” XXX (Adicionales/Extras)</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black uppercase text-slate-400 block">Asignar CategorÃ­a (Nombre)</label>
-                        <input
-                          type="text"
-                          placeholder="Ej. Demos o MembresÃ­a"
-                          value={planForm.categoria_nombre || ''}
-                          onChange={(e) => setPlanForm({ ...planForm, categoria_nombre: e.target.value })}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 text-slate-900 dark:text-white"
-                        />
-                      </div>
-                    </div>
-
-                    {/* ABAJO DEL CAMPO NOMBRE: Cantidad de pantallas que yo le vendo al cliente */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400 block">Pantallas Vendidas al Cliente (LÃ­mite de Reproductor)</label>
-                      {selPlan ? (
-                        <select
-                          value={planForm.screens || ''}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            const updatedTokens = calculateApiCreditCost(selPlan, val);
-                            setPlanForm({ 
-                              ...planForm, 
-                              screens: val,
-                              screens_api: val,
-                              tokens: updatedTokens
-                            });
-                          }}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 text-slate-900 dark:text-white"
-                        >
-                          {limits.options.map((opt: number) => (
-                            <option key={opt} value={opt}>
-                              {opt} {opt === 1 ? 'Pantalla' : 'Pantallas'}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="1"
-                          value={planForm.screens}
-                          onChange={(e) => {
-                            const valStr = e.target.value.replace(/[^0-9]/g, '');
-                            setPlanForm({ ...planForm, screens: valStr });
-                          }}
-                          className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-300"
-                        />
-                      )}
-                      <p className="text-[8px] text-slate-400 leading-normal">
-                        El reproductor limitarÃ¡ el inicio de sesiÃ³n a esta cantidad de pantallas vendidas al cliente final, independientemente del panel.
-                      </p>
-                    </div>
-
-                    {/* SI ES CREACION LIBRE - Muestra el resto de campos si no hay plan vinculado */}
-                    {!selPlan && (
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black uppercase text-slate-400">Meses</label>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={planForm.months}
-                            onChange={(e) => setPlanForm({ ...planForm, months: e.target.value.replace(/[^0-9]/g, '') })}
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300 text-slate-900 dark:text-white"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black uppercase text-slate-400">Horas</label>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={planForm.hours}
-                            onChange={(e) => setPlanForm({ ...planForm, hours: e.target.value.replace(/[^0-9]/g, '') })}
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300 text-slate-900 dark:text-white"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-black uppercase text-slate-400">Tokens</label>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="0"
-                            value={planForm.tokens}
-                            onChange={(e) => setPlanForm({ ...planForm, tokens: e.target.value.replace(/[^0-9]/g, '') })}
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300 text-slate-900 dark:text-white"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* ComisiÃ³n de Venta */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">ComisiÃ³n de Venta para Resellers (ARS)</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0"
-                        value={planForm.comision}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9.]/g, '');
-                          const parts = val.split('.');
-                          const cleanedVal = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
-                          setPlanForm({ ...planForm, comision: cleanedVal });
-                        }}
-                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border text-xs font-black rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300 text-slate-900 dark:text-white"
-                      />
-                    </div>
-
-                    {/* Monto Final de Venta Minorista */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Monto Final de Venta Minorista (ARS)</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0"
-                        value={planForm.value}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9.]/g, '');
-                          const parts = val.split('.');
-                          const cleanedVal = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
-                          setPlanForm({ ...planForm, value: cleanedVal });
-                        }}
-                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border text-xs font-black rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300 text-slate-900 dark:text-white"
-                      />
-                    </div>
-
-                    {/* DESGLOSE ÃšNICO DE COSTOS, COMISIÃ“N Y RENTABILIDAD */}
-                    <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 space-y-2.5 text-[10.5px] text-left">
-                      <div className="text-[9px] font-black uppercase text-indigo-500 tracking-wider">Desglose de Costos y Rentabilidad</div>
-                      
-                      {selPlan && (
-                        <div className="flex justify-between items-center text-slate-500 border-b dark:border-slate-850/50 pb-1.5">
-                          <span>MÃ³dulo enlazado:</span>
-                          <span className="font-bold text-slate-800 dark:text-slate-200">{selPlan.name}</span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between items-center text-slate-500">
-                        <span>Consumo de crÃ©ditos (Costo API):</span>
-                        <span className="font-extrabold text-indigo-600 dark:text-indigo-400 font-mono">
-                          {computedCredits} {computedCredits === 1 ? 'CrÃ©dito' : 'CrÃ©ditos'}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center text-slate-500">
-                        <span>Costo de Compra (ARS):</span>
-                        <span className="font-extrabold text-rose-500 font-mono">
-                          -${costArs.toLocaleString('es-ES')} ARS
-                        </span>
-                      </div>
-
-                      {comisionVenta > 0 && (
-                        <div className="flex justify-between items-center text-slate-500">
-                          <span>ComisiÃ³n Reseller (Deducible):</span>
-                          <span className="font-extrabold text-amber-600 font-mono">
-                            -${comisionVenta.toLocaleString('es-ES')} ARS
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between items-center border-t dark:border-slate-800 pt-2 text-slate-800 dark:text-slate-100 font-bold">
-                        <span>Ganancia Neta Estimada:</span>
-                        <span className={`font-black font-mono text-xs ${gananciaEstimada >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
-                          ${gananciaEstimada.toLocaleString('es-ES')} ARS
-                        </span>
-                      </div>
-
-                      {selPlan && costArs > 0 && (
-                        <div className="flex justify-between items-center text-slate-500 text-[9.5px]">
-                          <span>Retorno (ROI) Proyectado:</span>
-                          <span className={`font-black font-mono ${gananciaEstimada >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
-                            +{roiPercent}%
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
-
-              {/* SI REGISTRAMOS UN PLAN MAYORISTA (PAQUETE DE PROVEEDOR MANUAL) */}
-              {editingPlanType === 'provider' && (
-                <>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Conectar con Costo de Proveedor</label>
-                    <select
-                      value={planForm.provider_cost_id || ''}
-                      onChange={(e) => {
-                        const costId = e.target.value;
-                        const matchedCost = providerCosts.find(c => c.id === costId);
-                        if (matchedCost) {
-                          const unitPriceUsd = matchedCost.creditos > 0 ? (matchedCost.precio / matchedCost.creditos) : 0;
-                          const tokenPriceArs = unitPriceUsd > 0 ? Math.round(unitPriceUsd * dollarRate) : 1500;
-                          setPlanForm({
-                            ...planForm,
-                            provider_cost_id: costId,
-                            provider_name: matchedCost.proveedor || '',
-                            token_price: tokenPriceArs,
-                            value: tokenPriceArs * planForm.tokens
-                          });
-                          toast.info(`Vinculado a ${matchedCost.proveedor || 'Proveedor'} (${matchedCost.plan || 'Sin Plan'}) - Costo: u$s ${unitPriceUsd.toFixed(2)}/crÃ©d.`);
-                        } else {
-                          setPlanForm({
-                            ...planForm,
-                            provider_cost_id: ''
-                          });
-                        }
-                      }}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800"
-                    >
-                      <option value="">-- No vincular a un costo registrado (Por defecto) --</option>
-                      {providerCosts.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.proveedor || 'Sin Nombre'} - {c.plan || 'Sin Plan'} (u$s {c.precio} / {c.creditos} crÃ©d.)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase text-slate-400">Nombre del Paquete</label>
-                    <input
-                      type="text"
-                      placeholder="Ej. Demo 2hs o Plan Oficial 1 Mes"
-                      value={planForm.name}
-                      onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">DuraciÃ³n (Meses)</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={planForm.months}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '');
-                          setPlanForm({ ...planForm, months: val });
-                        }}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">DuraciÃ³n (Horas)</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={planForm.hours}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '');
-                          setPlanForm({ ...planForm, hours: val });
-                        }}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Pantallas</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={planForm.screens}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '');
-                          setPlanForm({ ...planForm, screens: val });
-                        }}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Tokens / Credits</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={planForm.tokens}
-                        onChange={(e) => {
-                          const tokValStr = e.target.value.replace(/[^0-9]/g, '');
-                          const tokValNum = parseInt(tokValStr) || 0;
-                          setPlanForm({
-                            ...planForm,
-                            tokens: tokValStr,
-                            value: tokValNum * (Number(planForm.token_price) || 0)
-                          });
-                        }}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Conexiones Base API</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="1"
-                        value={planForm.max_connections ?? ''}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '');
-                          setPlanForm({ ...planForm, max_connections: val });
-                        }}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">MÃ¡x Conexiones API</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="5"
-                        value={planForm.multiple_connections ?? ''}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '');
-                          setPlanForm({ ...planForm, multiple_connections: val });
-                        }}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Precios Multiconx (JSON)</label>
-                      <input
-                        type="text"
-                        placeholder='[{"connections":2,"price":1}]'
-                        value={planForm.multiconx_pricing || ''}
-                        onChange={(e) => setPlanForm({ ...planForm, multiconx_pricing: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border text-[10px] font-mono rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* INTERRUPTOR DE CONSOLA DE DESARROLLADOR */}
-              {(() => {
-                const hasConsolePermission = userRole === 'Admin' || userRole === 'Administrador' || String(userRole).toLowerCase() === 'admin' || hasPermission('Admin.ConsolaAPI.Ver') || hasPermission('Admin.*') || hasPermission('Seguridad.AdministradorGeneral') || user?.email === 'g3d0001@gmail.com';
-                if (!hasConsolePermission) return null;
-                return (
-                  <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border dark:border-slate-850/60">
-                    <div className="flex flex-col pr-2">
-                      <span className="text-[10px] font-black uppercase tracking-wide text-slate-750 dark:text-slate-200">
-                        ğŸ’» Consola de Desarrollador
-                      </span>
-                      <span className="text-[8px] text-slate-400">
-                        Mostrar parÃ¡metros JSON y comandos curl de la API.
-                      </span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer select-none shrink-0">
-                      <input
-                        type="checkbox"
-                        checked={showConsoles}
-                        onChange={(e) => setShowConsoles(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-200 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                    </label>
-                  </div>
-                );
-              })()}
-
-              {/* CONSOLA INTERACTIVA CON EL CÃ“DIGO DEL PLAN Y EL COMANDO XC */}
-              {showConsoles && (userRole === 'Admin' || userRole === 'Administrador' || String(userRole).toLowerCase() === 'admin' || hasPermission('Admin.ConsolaAPI.Ver') || hasPermission('Admin.*') || hasPermission('Seguridad.AdministradorGeneral') || user?.email === 'g3d0001@gmail.com') && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {/* Panel 1: CÃ³digo del Plan */}
-                  <div className="bg-slate-950 text-slate-300 font-mono text-[9px] p-3 rounded-2xl border border-slate-800 space-y-1.5 flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-center pb-1.5 border-b border-slate-800/80 mb-1.5">
-                        <span className="text-emerald-400 font-bold uppercase tracking-wider text-[8px] flex items-center gap-1">
-                          <Terminal size={10} /> CÃ³digo del Plan a Guardar
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const payloadToCopy = JSON.stringify({
-                              id: editingPlanId || `sale-${Date.now()}`,
-                              provider_plan_id: planForm.provider_plan_id || null,
-                              name: planForm.name || "(Sin Nombre)",
-                              months: Number(planForm.months) || 0,
-                              hours: Number(planForm.hours) || 0,
-                              screens: Number(planForm.screens) || 1,
-                              tokens: Number(planForm.tokens) || 0,
-                              price: Number(planForm.value) || 0,
-                              ...(editingPlanType === 'sale' ? {
-                                screens_api: planForm.screens_api !== '' ? Number(planForm.screens_api) : 1,
-                                comision: planForm.comision !== '' ? Number(planForm.comision) : 0
-                              } : {
-                                provider_name: planForm.provider_name ? planForm.provider_name.trim() : 'Lucas Mayorista',
-                                token_price: Number(planForm.token_price) || 1500,
-                                max_connections: Number(planForm.max_connections ?? planForm.screens ?? 1),
-                                multiple_connections: Number(planForm.multiple_connections ?? planForm.screens ?? 1),
-                                multiconx_pricing: planForm.multiconx_pricing || ''
-                              })
-                            }, null, 2);
-                            navigator.clipboard.writeText(payloadToCopy);
-                            toast.success('Â¡CÃ³digo copiado al portapapeles!');
-                          }}
-                          className="text-[8px] text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 px-1.5 py-0.5 rounded cursor-pointer transition-all"
-                        >
-                          Copiar CÃ³digo
-                        </button>
-                      </div>
-                      <pre className="overflow-x-auto max-h-[110px] custom-scrollbar text-emerald-400 text-[9px] leading-relaxed select-all">
-                        {JSON.stringify({
-                          id: editingPlanId || `sale-${Date.now()}`,
-                          provider_plan_id: planForm.provider_plan_id || null,
-                          name: planForm.name || "(Sin Nombre)",
-                          months: Number(planForm.months) || 0,
-                          hours: Number(planForm.hours) || 0,
-                          screens: Number(planForm.screens) || 1,
-                          tokens: Number(planForm.tokens) || 0,
-                          price: Number(planForm.value) || 0,
-                          ...(editingPlanType === 'sale' ? {
-                            screens_api: planForm.screens_api !== '' ? Number(planForm.screens_api) : 1,
-                            comision: planForm.comision !== '' ? Number(planForm.comision) : 0
-                          } : {
-                            provider_name: planForm.provider_name ? planForm.provider_name.trim() : 'Lucas Mayorista',
-                            token_price: Number(planForm.token_price) || 1500,
-                            max_connections: Number(planForm.max_connections ?? planForm.screens ?? 1),
-                            multiple_connections: Number(planForm.multiple_connections ?? planForm.screens ?? 1),
-                            multiconx_pricing: planForm.multiconx_pricing || ''
-                          })
-                        }, null, 2)}
-                      </pre>
-                    </div>
-                  </div>
-
-                  {/* Panel 2: Comando API Panel XC/XUI */}
-                  <div className="bg-slate-950 text-slate-300 font-mono text-[9px] p-3 rounded-2xl border border-slate-800 space-y-1.5 flex flex-col justify-between">
-                    <div>
-                      <div className="flex justify-between items-center pb-1.5 border-b border-slate-800/80 mb-1.5">
-                        <span className="text-cyan-400 font-bold uppercase tracking-wider text-[8px] flex items-center gap-1">
-                          <Terminal size={10} /> Comando API (XC create_line)
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const screensVal = planForm.screens_api !== '' ? Number(planForm.screens_api) : 1;
-                            let curlCommand = `curl -X POST "http://dominio-panel:port/access/reseller/index.php" \\\n    -d "api_key=YOUR_KEY" \\\n    -d "action=create_line" \\\n    -d "package=${planForm.provider_plan_id || "ID_PAQUETE"}" \\\n    -d "trial=${(Number(planForm.hours) > 0) ? "1" : "0"}"`;
-                            if (screensVal > 1) {
-                              curlCommand += ` \\\n    -d "max_connections=${screensVal}"`;
-                            }
-                            curlCommand += ` \\\n    -d "reseller_notes=NOMBRE_COMPLETO_CLIENTE (XTV) - ${planForm.name || "Plan Minorista"}"`;
-                            navigator.clipboard.writeText(curlCommand);
-                            toast.success('Â¡Comando curl copiado!');
-                          }}
-                          className="text-[8px] text-slate-400 hover:text-white bg-slate-900 border border-slate-800 hover:border-slate-700 px-1.5 py-0.5 rounded cursor-pointer transition-all"
-                        >
-                          Copiar curl
-                        </button>
-                      </div>
-                      <pre className="overflow-x-auto max-h-[110px] custom-scrollbar text-cyan-400 text-[9px] leading-relaxed select-all whitespace-pre-wrap">
-{`curl -X POST "http://dominio-panel:port/access/reseller/index.php" \\
-    -d "api_key=YOUR_KEY" \\
-    -d "action=create_line" \\
-    -d "package=${planForm.provider_plan_id || "ID_PAQUETE"}" \\
-    -d "trial=${(Number(planForm.hours) > 0) ? "1" : "0"}"${(planForm.screens_api !== '' && Number(planForm.screens_api) > 1) ? ` \\\n    -d "max_connections=${planForm.screens_api}"` : ""}${(planForm.name) ? ` \\\n    -d "reseller_notes=NOMBRE_CLIENTE (XTV) - ${planForm.name}"` : ""}`}
-                      </pre>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="w-full bg-slate-900 hover:bg-slate-850 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-wider transition-all cursor-pointer"
-              >
-                {editingPlanId ? 'Guardar Cambios' : 'Registrar Nuevo Plan / Combo'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* MODAL 3: FICHA DE DETALLE COMPLETO DEL CLIENTE (MÃXIMA INFO) */}
-      {/* ========================================================= */}
-      {selectedClient && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[45]"
-          onClick={handleCloseAndSaveClientModal}
-        >
-          <div 
-            className="bg-white dark:bg-slate-950 border dark:border-slate-800 rounded-3xl w-full max-w-2xl max-h-[90vh] shadow-2xl p-6 overflow-y-auto space-y-6 relative block text-slate-900 dark:text-white"
-            onClick={(e) => e.stopPropagation()}
-          >
-            
-            <button
-              onClick={handleCloseAndSaveClientModal}
-              className="absolute top-4 right-4 size-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 transition-colors cursor-pointer"
-              title="Guardar avances localmente y cerrar ficha"
-            >
-              <X size={16} />
-            </button>
-
-            {/* Titulo */}
-            <div className="border-b dark:border-slate-800 pb-3 flex items-center gap-3">
-              <div className="p-2.5 bg-slate-100 dark:bg-slate-900 rounded-xl text-slate-800 dark:text-white">
-                <User size={20} />
-              </div>
-              <div className="flex-1">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block font-sans">Ficha Unificada de Cliente IPTV</span>
-                <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
-                  {selectedClient.username}
-                  {((selectedClient as any).bitacora_comentarios || []).some((c: any) => c.es_problematico) && (
-                    <span className="text-[8px] bg-red-500 text-white font-extrabold uppercase px-2 py-0.5 rounded-full flex items-center gap-0.5 animate-pulse">
-                      <AlertTriangle size={10} className="shrink-0" /> Cliente Conflictivo
-                    </span>
-                  )}
-                </h2>
-              </div>
-            </div>
-
-            {/* SISTEMA DE ADVERTENCIA CRUCIAL DE CLIENTE PROBLEMATICO */}
-            {(() => {
-              const itemsConflictivos = ((selectedClient as any).bitacora_comentarios || []).filter((c: any) => c.es_problematico);
-              if (itemsConflictivos.length > 0) {
-                return (
-                  <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-900/40 p-3 rounded-2xl flex gap-3 text-amber-900 dark:text-amber-400 font-sans text-xs">
-                    <AlertTriangle className="shrink-0 text-amber-600 mt-0.5" size={18} />
-                    <div>
-                      <h5 className="font-extrabold uppercase tracking-wide text-[11px]">âš ï¸ ADVERTENCIA: COMPORTAMIENTO PROBLEMÃTICO ({itemsConflictivos.length})</h5>
-                      <p className="font-bold text-[10px] mt-0.5 text-slate-700 dark:text-slate-300">Este usuario tiene registros histÃ³ricos de alerta por conducta conflictiva, falta de pago o reclamos abusivos. Manejar con mÃ¡xima precauciÃ³n y cautela.</p>
-                    </div>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-
-            {/* ADVERTENCIA DE SUSCRIPCIÃ“N EXPIRADA (Tu membresÃ­a ha vencido) */}
-            {checkVencido(selectedClient.fecha_vencimiento) && (
-              <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-250 p-4 rounded-2xl space-y-3">
-                <div className="flex gap-2 text-rose-700 dark:text-rose-400 font-extrabold text-[11px] leading-relaxed">
-                  <AlertTriangle className="shrink-0 text-rose-500" size={18} />
-                  <div>
-                    <h5 className="font-black uppercase">Â¡SuscripciÃ³n Expirada en Vivo!</h5>
-                    <p className="mt-1 font-bold">El cliente se encuentra bloqueado del sistema XTV. Al iniciar la aplicaciÃ³n verÃ¡ el siguiente aviso restrictivo corporativo:</p>
-                  </div>
-                </div>
-
-                {/* Cartel simulado de bloqueo en celular del cliente */}
-                <div className="bg-slate-950 text-white rounded-xl p-3 border border-rose-900/50 font-mono text-[9.5px] leading-normal uppercase">
-                  <div className="text-rose-500 font-black tracking-widest mb-1">â— XTV LOCKOUT STATUS</div>
-                  "Tu membresÃ­a ha vencido. Por favor contacta con nosotros para renovar. Datos de contacto: WhatsApp {supportContactInfo} o correo de soporte oficial."
-                </div>
-
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(`Hola ${selectedClient.username}, tu membresÃ­a de XTV ha vencido. Para renovar por favor escrÃ­benos o realiza el pago correspondiente del combo.`);
-                    toast.success('Mensaje unificado para WhatsApp copiado al portapapeles');
-                  }}
-                  className="bg-white border rounded-lg px-2.5 py-1.5 text-[9px] font-black text-slate-800 flex items-center gap-1 hover:bg-slate-50 cursor-pointer"
-                >
-                  <Copy size={11} /> Copiar Aviso de RenovaciÃ³n
-                </button>
-              </div>
-            )}
-
-            {/* INDIVIDUAL TABBED SYSTEM CONTROLS (Misma textura, bordes y fuentes con contraste excelente) */}
-            <div className="flex border-b dark:border-slate-800 gap-1 overflow-x-auto mb-3">
-              <button
-                type="button"
-                onClick={() => setActiveClientTab('info')}
-                className={`py-2 px-3 text-[10px] font-black uppercase rounded-t-xl transition-colors cursor-pointer border-b-2 flex items-center gap-1.5 ${
-                  activeClientTab === 'info'
-                    ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-900/40'
-                    : 'border-transparent text-slate-400 hover:text-slate-700'
-                }`}
-              >
-                <Info size={13} /> InformaciÃ³n de Acceso
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveClientTab('profiles')}
-                className={`py-2 px-3 text-[10px] font-black uppercase rounded-t-xl transition-colors cursor-pointer border-b-2 flex items-center gap-1.5 ${
-                  activeClientTab === 'profiles'
-                    ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-900/40'
-                    : 'border-transparent text-slate-400 hover:text-slate-700'
-                }`}
-              >
-                <Users size={13} /> Subperfiles ({profiles.filter(p => p.username_cuenta === selectedClient.username).length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveClientTab('soporte')}
-                className={`py-2 px-3 text-[10px] font-black uppercase rounded-t-xl transition-colors cursor-pointer border-b-2 flex items-center gap-1.5 ${
-                  activeClientTab === 'soporte'
-                    ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-900/40'
-                    : 'border-transparent text-slate-400 hover:text-slate-700'
-                }`}
-              >
-                <MessageSquare size={13} /> BitÃ¡cora Chat Soporte
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveClientTab('comentarios')}
-                className={`py-2 px-3 text-[10px] font-black uppercase rounded-t-xl transition-colors cursor-pointer border-b-2 flex items-center gap-1.5 ${
-                  activeClientTab === 'comentarios'
-                    ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white bg-slate-50 dark:bg-slate-900/40'
-                    : 'border-transparent text-slate-400 hover:text-slate-700'
-                }`}
-              >
-                <AlertTriangle size={13} /> BitÃ¡cora Comentario ({((selectedClient as any).bitacora_comentarios || []).length})
-              </button>
-            </div>
-
-            {/* UNIFIED CONTAINER CARD WITH EXACTLY THE SAME OUTLINE, BACKGROUND TEXTURE AND CONTRAST */}
-            {/* UNIFIED CONTAINER CARD WITH EXACTLY THE SAME OUTLINE, BACKGROUND TEXTURE AND CONTRAST */}
-            <div className="bg-slate-50 dark:bg-slate-905 p-4 rounded-2xl border dark:border-slate-800 min-h-[300px]">
-
-              {/* TAB 1: ACCESO & INFORMACIÃ“N GENERAL */}
-              {activeClientTab === 'info' && (() => {
-                const provPlan = providerPlans?.find(p => p.id === selectedClient.id_plan_proveedor);
-                const salePlan = salePlans?.find(p => p.id === selectedClient.id_plan_venta);
-                
-                const rawCost = provPlan ? Number(provPlan.cost) : 0;
-                const rawPrice = salePlan ? Number(salePlan.price) : 0;
-                const rawComision = salePlan ? Number(salePlan.comision || 0) : 0;
-                const margin = rawPrice - rawCost - rawComision;
-
-                const cleanPhone = (selectedClient.celular || '').replace(/\D/g, '');
-                const waUrl = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('54') ? cleanPhone : '54' + cleanPhone}` : null;
-                const isMapsLink = (selectedClient.direccion_actual || '').toLowerCase().includes('maps.google') || (selectedClient.direccion_actual || '').toLowerCase().includes('google.com/maps') || (selectedClient.direccion_actual || '').toLowerCase().includes('maps.app.goo.gl');
-
-                return (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs leading-normal">
-                      
-                      {/* CAJA 1: IDENTIDAD Y CONTACTO CLIENTE */}
-                      <div className="bg-white dark:bg-slate-950 p-4 rounded-2xl border dark:border-slate-800 flex flex-col justify-between space-y-3 shadow-sm">
-                        <div>
-                          <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-2">ğŸ‘¤ Perfil & Contacto Personal</span>
-                          <div className="space-y-2 text-[11px] font-bold font-sans">
-                            <div className="flex justify-between items-start">
-                              <span className="text-slate-400">Nombre Real:</span>
-                              <span className="text-slate-800 dark:text-white font-extrabold text-right">{selectedClient.nombre_completo || 'No Registrado'}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-slate-400">Celular MÃ³vil:</span>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-slate-800 dark:text-white font-mono">{selectedClient.celular || 'No Registrado'}</span>
-                                {waUrl && (
-                                  <a 
-                                    href={waUrl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="px-2 py-0.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-450 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-0.5 transition-colors"
-                                    title="Escribir al WhatsApp de este cliente de forma directa"
-                                  >
-                                    WhatsApp
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex justify-between items-start leading-tight">
-                              <span className="text-slate-400 shrink-0">DirecciÃ³n GPS:</span>
-                              <div className="text-right">
-                                {isMapsLink ? (
-                                  <a 
-                                    href={selectedClient.direccion_actual} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="text-indigo-500 font-extrabold hover:underline text-[10px] break-all max-w-[150px] inline-block"
-                                    title="Abrir ubicaciÃ³n GPS en Google Maps"
-                                  >
-                                    ğŸ“ Ver ubicaciÃ³n GPS Google Maps
-                                  </a>
-                                ) : (
-                                  <span className="text-slate-800 dark:text-white text-[10.5px] max-w-[155px] inline-block break-words">{selectedClient.direccion_actual || 'No Registrada'}</span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-900">
-                              <span className="text-slate-400">Fecha de Alta:</span>
-                              <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px]">
-                                {selectedClient.fecha_creacion 
-                                  ? new Date(selectedClient.fecha_creacion).toLocaleDateString('es-AR', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'})
-                                  : 'No disponible'}
-                              </span>
-                            </div>
-
-                            {/* RESPUESTA RÃPIDA (OPCIÃ“N C) */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setMessageClient(selectedClient);
-                                setSelectedTemplateId('');
-                                setCustomizedMessageText('');
-                                setShowMessageModal(true);
-                              }}
-                              className="mt-3 w-full bg-slate-900 hover:bg-slate-800 text-white dark:bg-slate-800 dark:hover:bg-slate-700 py-2 rounded-xl text-[9.5px] uppercase font-black tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-colors border dark:border-slate-700"
-                              title="Seleccionar una respuesta rÃ¡pida con variables dinÃ¡micas de este cliente para copiar o WhatsApp"
-                            >
-                              <MessageSquare size={13} /> Enviar Respuesta RÃ¡pida (OpciÃ³n C)
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* CAJA 2: CREDENCIALES DE ACCESO TÃ‰CNICO IPTV */}
-                      <div className="bg-white dark:bg-slate-950 p-4 rounded-2xl border dark:border-slate-800 flex flex-col justify-between space-y-3 shadow-sm">
-                        <div>
-                          <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-2">âš¡ Credenciales de Acceso Xtream</span>
-                          <div className="space-y-1.5 text-[11px] font-bold font-sans">
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-slate-400">Usuario Xtream:</span>
-                              <div className="flex items-center gap-1 font-mono">
-                                <span className="bg-slate-50 dark:bg-slate-900 px-1.5 py-0.5 rounded text-slate-800 dark:text-slate-100 border dark:border-slate-850">{selectedClient.username}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(selectedClient.username);
-                                    toast.success("Usuario copiado al portapapeles");
-                                  }}
-                                  className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                                  title="Copiar Usuario"
-                                >
-                                  <Copy size={11} />
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-slate-400">ContraseÃ±a:</span>
-                              <div className="flex items-center gap-1 font-mono">
-                                <span className="bg-slate-50 dark:bg-slate-900 px-1.5 py-0.5 rounded text-slate-800 dark:text-slate-100 border dark:border-slate-850">
-                                  {visiblePasswords[selectedClient.username] ? selectedClient.password : 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢'}
-                                </span>
-                                <button 
-                                  type="button"
-                                  onClick={(e) => togglePasswordVisibility(selectedClient.username, e)} 
-                                  className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
-                                  title="Ver / Ocultar"
-                                >
-                                  {visiblePasswords[selectedClient.username] ? <EyeOff size={11} /> : <Eye size={11} />}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(selectedClient.password);
-                                    toast.success("ContraseÃ±a copiada al portapapeles");
-                                  }}
-                                  className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                                  title="Copiar ContraseÃ±a"
-                                >
-                                  <Copy size={11} />
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="flex justify-between items-start gap-2 pt-1 border-t border-slate-100 dark:border-slate-900">
-                              <span className="text-slate-400 shrink-0">DNS URL Host:</span>
-                              <div className="flex items-center gap-1 justify-end max-w-[130px] sm:max-w-none">
-                                <span className="text-[10px] text-slate-500 font-mono break-all text-right select-all">{selectedClient.url_panel_asignada}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(selectedClient.url_panel_asignada);
-                                    toast.success("DNS URL Host copiado al portapapeles");
-                                  }}
-                                  className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-slate-600 transition-colors shrink-0 cursor-pointer"
-                                  title="Copiar DNS URL Host"
-                                >
-                                  <Copy size={10} />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* CAJA 3: PLAN DE VENTAS Y RENTABILIDAD */}
-                      <div className="bg-white dark:bg-slate-950 p-4 rounded-2xl border dark:border-slate-800 sm:col-span-2 space-y-3 shadow-sm">
-                        <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block pb-1 border-b dark:border-slate-900">ğŸ“Š Plan Comercial & Costeo AnalÃ­tico</span>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-[11px] font-bold font-sans">
-                          
-                          <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl space-y-1 border dark:border-slate-850">
-                            <span className="text-[8px] font-black uppercase text-indigo-500 block">ğŸ›ï¸ Plan de Venta Minorista</span>
-                            <div className="font-extrabold text-slate-800 dark:text-white truncate max-w-full" title={salePlan ? salePlan.name : 'Por Defecto - 1 Mes'}>
-                              {salePlan ? salePlan.name : 'Venta Manual / Directa'}
-                            </div>
-                            <div className="text-[12px] font-black text-slate-900 dark:text-white font-mono mt-1">
-                              Precio de Venta: <span className="text-indigo-500">${rawPrice || 'N/A'}</span>
-                            </div>
-                          </div>
-
-                          <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl space-y-1 border dark:border-slate-850">
-                            <span className="text-[8px] font-black uppercase text-slate-500 block">ğŸ“¦ Plan Proveedor Mayorista</span>
-                            <div className="font-extrabold text-slate-600 dark:text-slate-305 truncate max-w-full" title={provPlan ? provPlan.name : 'GenÃ©rico - 1 Token'}>
-                              {provPlan ? provPlan.name : 'Token GenÃ©rico'}
-                            </div>
-                            <div className="text-[12px] font-bold text-slate-600 dark:text-slate-400 font-mono mt-1">
-                              Costo Mayorista: <span className="text-slate-800 dark:text-slate-200">${rawCost || '?' }</span>
-                            </div>
-                          </div>
-
-                          <div className="p-3 bg-indigo-500/5 dark:bg-indigo-500/10 rounded-xl space-y-1 border border-indigo-500/15 flex flex-col justify-center">
-                            <span className="text-[8px] font-black uppercase text-indigo-600 dark:text-indigo-400 block">ğŸ’µ Rentabilidad de Caja</span>
-                            <div className="text-[14px] font-black font-mono text-emerald-600 dark:text-emerald-400">
-                              Profit Neto: ${margin >= 0 ? `+${margin}` : margin}
-                            </div>
-                            {rawComision > 0 && (
-                              <span className="text-[8.5px] font-bold text-amber-600 block font-mono">
-                                ComisiÃ³n Reseller: -${rawComision}
-                              </span>
-                            )}
-                            {rawPrice > 0 && (
-                              <span className="text-[9px] font-black text-slate-500 block font-mono">
-                                Margen Neto: {((margin / rawPrice) * 100).toFixed(0)}%
-                              </span>
-                            )}
-                          </div>
-
-                        </div>
-                      </div>
-
-                      {/* CAJA 4: MEMBRESÃA XTV Y VIGENCIA */}
-                      <div className="bg-white dark:bg-slate-950 p-4 rounded-2xl border dark:border-slate-800 sm:col-span-2 text-[11px] font-bold font-sans space-y-2 pb-3 shadow-sm">
-                        <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block pb-1 border-b dark:border-slate-900">ğŸ“… Control de MembresÃ­a & Vigencia XTV</span>
-                        
-                        <div className="flex justify-between items-center text-[11px] font-sans">
-                          <span className="text-slate-400 font-bold">Fin de SuscripciÃ³n Vigente:</span>
-                          <span className={`font-black text-xs px-2.5 py-0.5 rounded-lg ${checkVencido(selectedClient.fecha_vencimiento) ? 'bg-rose-50 text-rose-500 dark:bg-rose-950/20' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20'}`}>
-                            {formatCompactDate(selectedClient.fecha_vencimiento)}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between items-center text-[11px] font-sans">
-                          <span className="text-slate-400 font-bold">LÃ­mite Local (Vendido):</span>
-                          <span className="text-slate-800 dark:text-white font-extrabold">{selectedClient.limite_pantallas || 1} {selectedClient.limite_pantallas === 1 ? 'pantalla' : 'pantallas'}</span>
-                        </div>
-
-                        <div className="flex justify-between items-center text-[11px] font-sans">
-                          <span className="text-slate-400 font-bold">LÃ­mite Proveedor (API):</span>
-                          <span className="text-slate-800 dark:text-white font-extrabold">{(selectedClient as any).limite_pantallas_api || 3} {((selectedClient as any).limite_pantallas_api || 3) === 1 ? 'conexiÃ³n' : 'conexiones'}</span>
-                        </div>
-
-                        <div className="flex justify-between items-center pt-2 mt-1 border-t border-slate-100 dark:border-slate-900">
-                          <span className="text-slate-400 font-bold">Onboarding de AplicaciÃ³n:</span>
-                          <span className={`text-[9.5px] px-2 py-0.5 rounded-full font-black uppercase ${selectedClient.primer_login_completado ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20' : 'bg-amber-50 text-amber-600 dark:bg-amber-955/10'}`}>
-                            {selectedClient.primer_login_completado ? 'Completado (Home & Banner Activos)' : 'Primer Ingreso Pendiente'}
-                          </span>
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {selectedClient.comentarios && (
-                      <div className="bg-white dark:bg-slate-950 p-4 rounded-2xl border dark:border-slate-800 border-l-4 border-l-slate-400 pt-3">
-                        <span className="text-[8px] font-black uppercase text-slate-400 block pb-1">Notas logÃ­sticas de caja:</span>
-                        <p className="text-[11px] text-slate-700 dark:text-slate-350 leading-relaxed font-bold">{selectedClient.comentarios}</p>
-                      </div>
-                    )}
-
-                    {/* Acciones en Vivo si viene del Panel API */}
-                    {selectedClient.isFromApi && (
-                      <div className="bg-indigo-50/50 dark:bg-indigo-950/10 p-4 rounded-2xl border border-indigo-200 dark:border-indigo-900/40 space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-450 flex items-center gap-1">
-                            <Globe size={11} /> Acciones TÃ©cnicas en Vivo (XM Reseller API)
-                          </span>
-                          <span className="text-[8px] bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-extrabold px-1.5 py-0.5 rounded-full">Sincronizado</span>
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-2 pt-1 font-sans">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (confirm(`Â¿Habilitar lÃ­nea tÃ©cnica para "${selectedClient.username}"?`)) {
-                                toast.loading("Habilitando lÃ­nea en el panel...");
-                                try {
-                                  const res = await fetch("/api/iptv/xui", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({
-                                      action: "enable_line",
-                                      xuiUrl: xuiConfig.xui_url,
-                                      xuiToken: xuiConfig.xui_token,
-                                      username: selectedClient.username
-                                    })
-                                  });
-                                  const dat = await res.json();
-                                  toast.dismiss();
-                                  if (dat.success) {
-                                    toast.success("Â¡LÃ­nea habilitada exitosamente en el panel!");
-                                    setSelectedClient({ ...selectedClient, estado: 'Activo' });
-                                    await fetchApiAccounts(true);
-                                  } else {
-                                    toast.error(`Fallo: ${dat.error || "No se pudo habilitar"}`);
-                                  }
-                                } catch (e: any) {
-                                  toast.dismiss();
-                                  toast.error(`Error: ${e.message}`);
-                                }
-                              }
-                            }}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-3 py-2 text-[10px] font-black uppercase flex items-center gap-1 cursor-pointer"
-                          >
-                            <CheckCircle size={11} /> Habilitar
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (confirm(`Â¿Pausar/Deshabilitar lÃ­nea tÃ©cnica para "${selectedClient.username}"?`)) {
-                                toast.loading("Pausando lÃ­nea en el panel...");
-                                try {
-                                  const res = await fetch("/api/iptv/xui", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({
-                                      action: "disable_line",
-                                      xuiUrl: xuiConfig.xui_url,
-                                      xuiToken: xuiConfig.xui_token,
-                                      username: selectedClient.username
-                                    })
-                                  });
-                                  const dat = await res.json();
-                                  toast.dismiss();
-                                  if (dat.success) {
-                                    toast.success("Â¡LÃ­nea pausada con Ã©xito!");
-                                    setSelectedClient({ ...selectedClient, estado: 'Pausado' });
-                                    await fetchApiAccounts(true);
-                                  } else {
-                                    toast.error(`Fallo: ${dat.error || "No se pudo deshabilitar"}`);
-                                  }
-                                } catch (e: any) {
-                                  toast.dismiss();
-                                  toast.error(`Error: ${e.message}`);
-                                }
-                              }
-                            }}
-                            className="bg-amber-605 hover:bg-amber-700 text-white rounded-xl px-3 py-2 text-[10px] font-black uppercase flex items-center gap-1 cursor-pointer"
-                          >
-                            <Lock size={11} /> Deshabilitar
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleImportToLocal(selectedClient)}
-                            className="bg-slate-900 hover:bg-slate-850 text-white rounded-xl px-3 py-2 text-[10px] font-black uppercase flex items-center gap-1 cursor-pointer shadow-sm"
-                          >
-                            <Database size={11} /> Importar Localmente
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (confirm(`Â¿ALERTA MÃXIMA!\nEsta acciÃ³n eliminarÃ¡ de forma irreversible el usuario "${selectedClient.username}" de tu panel de crÃ©ditos reseller. Â¿EstÃ¡s seguro?`)) {
-                                toast.loading("Borrando lÃ­nea tÃ©cnica en el panel...");
-                                try {
-                                  const res = await fetch("/api/iptv/xui", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({
-                                      action: "delete_line",
-                                      xuiUrl: xuiConfig.xui_url,
-                                      xuiToken: xuiConfig.xui_token,
-                                      username: selectedClient.username
-                                    })
-                                  });
-                                  const dat = await res.json();
-                                  toast.dismiss();
-                                  if (dat.success) {
-                                    toast.success("Â¡LÃ­nea eliminada de forma definitiva del panel!");
-                                    setSelectedClient(null);
-                                    await fetchApiAccounts(true);
-                                  } else {
-                                    toast.error(`Fallo: ${dat.error || "No se pudo eliminar"}`);
-                                  }
-                                } catch (e: any) {
-                                  toast.dismiss();
-                                  toast.error(`Error: ${e.message}`);
-                                }
-                              }
-                            }}
-                            className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-3 py-2 text-[10px] font-black uppercase flex items-center gap-1 cursor-pointer ml-auto"
-                          >
-                            <Trash2 size={11} /> Borrar del Panel
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* TAB 2: GESTIÃ“N DE SUBPERFILES */}
-              {activeClientTab === 'profiles' && (
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b dark:border-slate-800">
-                    <div className="text-left">
-                      <h4 className="text-xs font-black uppercase text-slate-600 dark:text-slate-400 font-sans">Subperfiles del Hogar ({profiles.filter(p => p.username_cuenta === selectedClient.username).length} / 5)</h4>
-                      <p className="text-[10px] text-slate-400 font-medium">Asigna perfiles familiares independientes estilo streaming con PIN y avatares personalizados.</p>
-                    </div>
-
-                    {profiles.filter(p => p.username_cuenta === selectedClient.username).length < 5 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowProfileForm(!showProfileForm)}
-                        className="bg-slate-900 hover:bg-slate-850 dark:bg-slate-800 dark:hover:bg-slate-750 text-white text-[9.5px] font-black uppercase px-2.5 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer w-fit"
-                      >
-                        <Plus size={11} /> {showProfileForm ? 'Cancelar Registro' : 'AÃ±adir Perfil'}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Formulario Inline de CreaciÃ³n */}
-                  {showProfileForm && (
-                    <form onSubmit={handleAddSubprofile} className="bg-white dark:bg-slate-950 p-4 rounded-xl border dark:border-slate-800 space-y-3">
-                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block text-left">Registrar Nuevo Perfil Familiar</span>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="space-y-1 text-left">
-                          <label className="text-[9px] font-black uppercase text-slate-400">Nombre de la pantalla</label>
-                          <input
-                            type="text"
-                            placeholder="Ej. Living, Dormitorio, PapÃ¡..."
-                            value={newProfileName}
-                            onChange={(e) => setNewProfileName(e.target.value)}
-                            className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-
-                        <div className="space-y-1 text-left">
-                          <label className="text-[9px] font-black uppercase text-slate-400">PIN de 4 dÃ­gitos (Opcional)</label>
-                          <input
-                            type="text"
-                            maxLength={4}
-                            placeholder="Ej. 1234 (vacÃ­o para libre)"
-                            value={newProfilePin}
-                            onChange={(e) => setNewProfilePin(e.target.value.replace(/\D/g, ''))}
-                            className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
-                          />
-                        </div>
-
-                        <div className="space-y-1 text-left">
-                          <label className="text-[9px] font-black uppercase text-slate-400 block">Preset de Avatar</label>
-                          <div className="flex gap-2 items-center mt-1 overflow-x-auto py-1">
-                            {[
-                              'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
-                              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
-                              'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80',
-                              'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&h=150&q=80',
-                              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80'
-                            ].map((av, avIdx) => (
-                              <button
-                                key={avIdx}
-                                type="button"
-                                onClick={() => setNewProfileAvatar(av)}
-                                className={`size-8 rounded-full overflow-hidden border-2 cursor-pointer transition-all shrink-0 ${
-                                  newProfileAvatar === av ? 'border-slate-900 dark:border-white scale-110 shadow' : 'border-transparent opacity-80 hover:opacity-100'
-                                }`}
-                              >
-                                <img src={av} alt="Avatar Preset" className="size-full object-cover" />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end gap-2 pt-1 border-t dark:border-slate-900">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowProfileForm(false);
-                            setNewProfileName('');
-                            setNewProfilePin('');
-                            setNewProfileAvatar('');
-                          }}
-                          className="bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-black uppercase px-3 py-1.5 rounded-lg"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="submit"
-                          className="bg-slate-900 hover:bg-slate-850 dark:bg-indigo-650 dark:hover:bg-indigo-600 text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-lg cursor-pointer"
-                        >
-                          Guardar Subperfil
-                        </button>
-                      </div>
-                    </form>
-                  )}
-
-                  {/* Listado en Rejilla estilo Netflix */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {profiles.filter(p => p.username_cuenta === selectedClient.username).map(p => {
-                      return (
-                        <div key={p.id} className="bg-white dark:bg-slate-950 p-4 rounded-xl border dark:border-slate-800 flex items-center justify-between group">
-                          <div className="flex items-center gap-3">
-                            <div className="size-11 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-                              <img src={p.avatar_url || `https://api.dicebear.com/7.x/pixel-art/svg?seed=${p.nombre_perfil}`} alt="Avatar" className="size-full object-cover" />
-                            </div>
-                            <div className="text-left">
-                              <span className="text-xs font-black text-slate-850 dark:text-white block">{p.nombre_perfil}</span>
-                              <span className="text-[9px] text-slate-400 block font-bold flex items-center gap-1.5 mt-0.5">
-                                {p.pin_perfil ? (
-                                  <span className="flex items-center gap-1">
-                                    <Lock size={10} className="text-amber-500" /> PIN: {p.pin_perfil}
-                                  </span>
-                                ) : (
-                                  <span className="flex items-center gap-1">
-                                    <Unlock size={10} className="text-emerald-500" /> Acceso Libre
-                                  </span>
-                                )}
-                              </span>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteSubprofile(p.id)}
-                            className="p-1.5 hover:bg-rose-50 dark:hover:bg-rose-955/30 rounded-lg text-rose-500 hover:text-rose-700 cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-                            title="Eliminar este subperfil de la cuenta"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      );
-                    })}
-
-                    {profiles.filter(p => p.username_cuenta === selectedClient.username).length === 0 && (
-                      <div className="col-span-full py-8 text-center bg-white dark:bg-slate-950 rounded-xl border dark:border-slate-800 italic text-[11px] text-slate-400 font-medium">
-                        Esta cuenta no posee subperfiles familiares aÃºn. Crea el primero desde el botÃ³n superior de adiciÃ³n.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 3: CANAL DE SOPORTE & SESIONES ACTIVAS EN VIVO */}
-              {activeClientTab === 'soporte' && (
-                <div className="space-y-5">
-                  <div className="flex justify-between items-center pb-2 border-b dark:border-slate-800">
-                    <div className="text-left">
-                      <h4 className="text-xs font-black uppercase text-slate-600 dark:text-slate-400 font-sans">Canal de Soporte Directo & Sesiones Activas en Vivo</h4>
-                      <p className="text-[10px] text-slate-400 font-medium font-sans">Visualiza las conexiones activas en tiempo real para expulsar usuarios excedidos o asentar chats en la bitÃ¡cora de soporte.</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                    {/* Panel 1: Sesiones Activas y ExpulsiÃ³n (5 columnas) */}
-                    <div className="lg:col-span-5 space-y-3">
-                      <div className="bg-white dark:bg-slate-950 p-4 rounded-xl border dark:border-slate-800 space-y-3 text-left">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[9.5px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1 font-sans">
-                            <Activity size={11} className="text-indigo-500 animate-pulse animate-none" /> Conexiones Concurrentes
-                          </span>
-                          <span className="text-[9px] font-mono font-bold bg-slate-100 dark:bg-slate-850 px-2 py-0.5 rounded text-slate-500 font-black">
-                            {activeSessions.filter(s => s.username_cuenta === selectedClient.username).length} de {selectedClient.limite_pantallas || 2} Activas
-                          </span>
-                        </div>
-
-                        <div className="space-y-2 max-h-[220px] overflow-y-auto">
-                          {activeSessions.filter(s => s.username_cuenta === selectedClient.username).map(sess => {
-                            const matchedProfileName = profiles.find(p => p.id === sess.perfil_id)?.nombre_perfil || 'Domo Familiar';
-                            return (
-                              <div key={sess.id} className="p-3 bg-slate-50 dark:bg-slate-900 border dark:border-slate-800 rounded-lg flex items-center justify-between text-left gap-2">
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 truncate">{sess.marca_modelo}</span>
-                                  </div>
-                                  <span className="text-[9px] text-slate-400 block mt-0.5 font-bold truncate">
-                                    Perfil: <strong className="text-indigo-500">{matchedProfileName}</strong> Â· IP: {sess.ip_conexion}
-                                  </span>
-                                </div>
-
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (confirm(`Â¿Expulsar la transmisiÃ³n en vivo del dispositivo ${sess.marca_modelo}? Esto obligarÃ¡ un reinicio de credencial en el de forma forzosa.`)) {
-                                      const res = await apiService.deleteIptvActiveSession(sess.id);
-                                      if (res.success) {
-                                        toast.success(`TransmisiÃ³n de ${sess.marca_modelo} expulsada y desconectada con Ã©xito.`);
-                                        await fetchData();
-                                      } else {
-                                        toast.error('OcurriÃ³ un error al expulsar la sesiÃ³n.');
-                                      }
-                                    }
-                                  }}
-                                  className="bg-rose-50 hover:bg-rose-100 dark:bg-rose-955/20 text-rose-500 hover:text-rose-650 p-1.5 rounded-lg border border-rose-105 dark:border-rose-900/40 text-[9px] font-bold cursor-pointer transition-colors shrink-0"
-                                  title="Expulsar de inmediato al dispositivo reproduciendo"
-                                >
-                                  Expulsar
-                                </button>
-                              </div>
-                            );
-                          })}
-
-                          {activeSessions.filter(s => s.username_cuenta === selectedClient.username).length === 0 && (
-                            <p className="text-[10px] text-slate-400 italic font-medium py-6 text-center">No hay pantallas de televisiÃ³n activas transmitiendo contenido en este momento.</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Panel 2: BitÃ¡cora Chat Soporte (7 columnas) */}
-                    <div className="lg:col-span-7 space-y-3">
-                      <div className="bg-white dark:bg-slate-950 p-4 rounded-xl border dark:border-slate-800 space-y-3 flex flex-col justify-between h-[300px]">
-                        {/* Lista de mensajes de Chat */}
-                        <div className="space-y-2 overflow-y-auto pr-1 flex-1 max-h-[190px]">
-                          {((selectedClient as any).chat_soporte || []).length === 0 ? (
-                            <p className="text-[10.5px] text-slate-400 italic text-center font-medium py-10">No se registran interacciones en el historial del ticket todavÃ­a.</p>
-                          ) : (
-                            ((selectedClient as any).chat_soporte || []).map((msg: any, iIdx: number) => {
-                              const isOp = msg.sender === 'operador';
-                              return (
-                                <div key={iIdx} className={`flex flex-col text-left ${isOp ? 'items-end' : 'items-start'}`}>
-                                  <div className={`p-2.5 rounded-xl text-[11px] leading-snug font-bold max-w-[85%] ${
-                                    isOp 
-                                      ? 'bg-slate-900 text-white dark:bg-indigo-650' 
-                                      : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
-                                  }`}>
-                                    <p className="break-words font-sans">{msg.text}</p>
-                                  </div>
-                                  <span className="text-[8px] text-slate-400 mt-1 font-mono uppercase font-black px-1 mt-0.5">
-                                    {isOp ? 'Soporte Admin' : 'Cliente'} Â· {new Date(msg.date).toLocaleTimeString()}
-                                  </span>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-
-                        {/* ConversaciÃ³n Form */}
-                        <form onSubmit={handleAddChatMessage} className="flex gap-2 pt-2 border-t dark:border-slate-900 text-left">
-                          <select
-                            value={newChatSender}
-                            onChange={(e: any) => setNewChatSender(e.target.value)}
-                            className="bg-slate-50 dark:bg-slate-900 border text-[9px] font-black uppercase px-2 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer text-slate-705 dark:text-slate-300"
-                            title="Seleccionar remitente de la respuesta"
-                          >
-                            <option value="operador">Admin</option>
-                            <option value="cliente">Cliente (Mock)</option>
-                          </select>
-                          <input
-                            type="text"
-                            placeholder="Redactar comentario/respuesta de soporte..."
-                            value={newChatMsg}
-                            onChange={(e) => setNewChatMsg(e.target.value)}
-                            className="flex-1 px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 font-sans"
-                          />
-                          <button
-                            type="submit"
-                            className="bg-slate-900 hover:bg-slate-850 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-[9.5px] font-black uppercase px-3 rounded-lg cursor-pointer"
-                          >
-                            Enviar
-                          </button>
-                        </form>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 4: BITÃCORA INTERNA DE COMENTARIOS */}
-              {activeClientTab === 'comentarios' && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-2 border-b dark:border-slate-800">
-                    <div className="text-left">
-                      <h4 className="text-xs font-black uppercase text-slate-600 dark:text-slate-400 font-sans">BitÃ¡cora Interna de Comentarios CrÃ­ticos & Operativos ({((selectedClient as any).bitacora_comentarios || []).filter((c: any) => !c.is_system).length})</h4>
-                      <p className="text-[10px] text-slate-400 font-medium font-sans">Escribe notas privadas o incidentes crÃ­ticos sobre pagos, zonas geogrÃ¡ficas de cobertura o fallas de servicio.</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                    {/* Historial (7 col) */}
-                    <div className="lg:col-span-7 space-y-2 max-h-[300px] overflow-y-auto">
-                      {(() => {
-                        const visibleBitacora = ((selectedClient as any).bitacora_comentarios || []).filter((c: any) => !c.is_system);
-                        return visibleBitacora.length === 0 ? (
-                          <div className="py-12 bg-white dark:bg-slate-950 rounded-xl border dark:border-slate-800 italic text-[11px] text-slate-400 font-medium text-center">
-                            No existen anotaciones guardadas para este cliente todavÃ­a.
-                          </div>
-                        ) : (
-                          visibleBitacora.map((bit: any, bIdx: number) => {
-                            return (
-                              <div key={bIdx} className={`p-3 bg-white dark:bg-slate-950 rounded-xl border text-left relative ${
-                                bit.es_problematico ? 'border-l-4 border-l-rose-500' : 'border-l-4 border-l-slate-400'
-                              }`}>
-                                {bit.es_problematico && (
-                                  <span className="absolute top-3 right-3 bg-rose-100 text-rose-600 dark:bg-rose-955/30 dark:text-rose-455 text-[8px] font-black px-1.5 py-0.2 rounded uppercase">
-                                    Alerta de Caja
-                                  </span>
-                                )}
-                                <p className="text-xs text-slate-700 dark:text-slate-300 font-bold leading-normal break-words max-w-[85%] font-sans">
-                                  {bit.text}
-                                </p>
-                                <div className="flex gap-2 items-center mt-2 text-[9px] text-slate-400 font-bold">
-                                  <span className="text-[9.5px] text-teal-600 dark:text-teal-400 font-extrabold">âš¡ Administrador</span>
-                                  <span>Â·</span>
-                                  <span className="font-mono">{formatCompactDate(bit.date)} {new Date(bit.date).toLocaleTimeString()}</span>
-                                </div>
-                              </div>
-                            );
-                          })
-                        );
-                      })()}
-                    </div>
-
-                    {/* Formulario (5 col) */}
-                    <form onSubmit={handleAddComenBitacora} className="lg:col-span-5 bg-white dark:bg-slate-950 p-4 rounded-xl border dark:border-slate-800 space-y-4">
-                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block text-left">Asentar Nuevo Evento de BitÃ¡cora</span>
-
-                      <div className="space-y-1 text-left">
-                        <label className="text-[9px] font-bold text-slate-400">AnotaciÃ³n Administrativa</label>
-                        <textarea
-                          placeholder="Ingresa notas operacionales del cliente para auditorÃ­a..."
-                          value={newComenBitacora}
-                          onChange={(e) => setNewComenBitacora(e.target.value)}
-                          rows={3}
-                          className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border text-xs font-bold rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none font-sans"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-2 text-left cursor-pointer select-none">
-                        <input
-                          id="check_bit_problem"
-                          type="checkbox"
-                          checked={newComenEsProblematico}
-                          onChange={(e) => setNewComenEsProblematico(e.target.checked)}
-                          className="size-3.5 rounded border text-slate-900 font-black accent-rose-500 cursor-pointer"
-                        />
-                        <label htmlFor="check_bit_problem" className="text-[10px] font-black text-rose-500 uppercase cursor-pointer">
-                          Marcar como alerta de caja
-                        </label>
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="w-full bg-slate-900 dark:bg-slate-800 text-white text-[9.5px] font-black uppercase py-2 rounded-lg tracking-wider hover:opacity-90 transition-opacity cursor-pointer"
-                      >
-                        Asentar Registro
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-            </div>
-
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
-}
+                          else if (nameLower.includes("2h") || nameLower.includes("2 hora") || nameLower.includes("2 hours")) houxœì½{oÜX–'øÿ~Š›BN*ät„ŞN[kÙ…³¢z´BvguvMEP,3ÈH’!Ë©Ğ½˜ùcĞ]=ÓY…]ta°9Ì¦›ÀÖÖş±è]`Ò7É/°ùöœ{/ÉKò>ÈPÈ’3MT9|\^ŞÇyŸß	B²MÖşÇÿ(Ûmâœšgí®ÿÚ×w§;¬-¬®–È_ÿ5‘_$#?°7Lƒpai‰ı}YÕvFsi0¬Èñ=hãåÇç´¹ÖêKu‹ìóÎ5íöı0‚6WtİŞ=°ÇşÕem²½½M'¯†õÕÑ"yLWYÉ–ü¶uvÛºá¶{ì¶{ém‹üo]'ÇÖYË÷”}ÜÕ×'Øğ:4¸ª2åå…À¦GjšÎ=8§¤ïZa¸e{a8‚ÿÔû¾Ö×H8ŞJn¡5©¯“ãa=t­È®?XY!Ç~0°ş~şşÊÊò½2'êìAıÌ]x¤éH±+áÄêÛõ7õUÃsğ¤kÛ®øldŸEõ/LÎ¾"'¾Õ]v2Lì oÁÂ£×YW7VVÅ³Ò‚E÷p™6g|i®»é˜lÂ‡ŸÁ(MŞÀøÑ7…¼¾;`}Ïg×ì±Xî û!Œ»Ö·½(ÚÜo®Ç…sÜE¤ØƒĞô=ËğA†b·ÜÚYÜáäàÏ {hıZæ/¦pêİÏ¿åıŸ½]ëŒ ¡´ûøÁáOh9¸é9–êÖá—ÇÈzòëú'—¶=p¦cS¯Hh»'|tµÏ&gæ;pqN³¿&Ìş—«+¹îæ–€5>†™­N‡“/Z ‘¹ööùĞv€×§ß„ŸT[º(±VTÎmíÌ|Ã’J6¹XÂş)./ßÁ]Yıˆ´Ç–ã’;Ëª™…ú¨–fa²ÕkÓµÏÈ¯¦aäœ¼©ÛÑkÛö´;"ó9ºñÄİUìÙ}ì˜Ğ‡ÍxP²ä¢¬N»éD–ëôíOú°,÷á2¶§	Ó–yèx“i¤épôf½´ñ³4·Zî9J³|(èHè–¨ïµF–7„§jöÙ~{Ÿ.sñùšİˆ¬ Öƒ¾@»ä'0¥öÆË¶ú~Øş¿ì»nÓFßëz/ÌÇëúÉÔuS.ÑØ,%ÙJ˜	=ózä UhÇ‰ßŸ†[ş4rÏ®{¾góSãr"şp¼3ôq-¨û¾¬šZ=WÀxh±uá[öüÈßÿ-˜ı÷iâK­À¶Êí¯ø;égÎ²Á2Ì¼ÃšÛF ÖN`ŸØíõË…_+°@®ğ¢Àw‰ƒ\ÒóÆŒğl?T×ë£úê½Ù÷a¥KrÎI'¿Ùj'X#Ÿ|¢ĞâUûu##¸ÀØŞSî§BÎ7v}•Î¦hsü·("Ñ	¤ûFÆoŒ73ÿ9>«[ÓÈÏMiÜüŠNŠ~Øõt`§¶Ï×Ö.f}]š3şº>Ä½Ôuf´Q &ÉJÌÓ¸ ~ãâzíà7§ktáìÊ(p˜Cjûc'rşÒÃåÑ†æÕ…‰)Ì”k[|m`»Ö™ÍĞ;¸U´TuÏ'ÖèĞ§±Z™zìxÚÛ¾sùGlÒ9¸K¬!N,şš†S+p|“ëú_OmŸm\¾=qú>£ğ<PŒÙ±ÙÏ±?ğï’hJ8Û& ‘Ià[~ÚÁ©D_2¶<Z]YùÄu|sç{c+ˆß%ãË?‚lé“ƒ¬8ã‰ ±#á›<µí`KŒFÙ©uzK%ŸÌe¡‰™ÄÖQÌPhõr<J¶`Pû¯t+RÎàJif	×CT°ŞQsg‹4[­voŸ4ŸtÚ‡Gûd§İÛi“Ö³f÷ÏŸÁÒİo5»¿l¶:—¿ÙÓ3Äë"ˆë3D×>‰JSB™X’%s|‹Ljr\_ÓM›¢›+Mí¹ûÄNá¾©]ªÕØĞ!Ò8ßX_O‘ä4é„$åHĞ‘ã,‚†ÿ„6Ğèìâqç†@Oáoåá[˜¤¤E $ğÒ‹‘uì¸ ¦A¿vú`Úw‚†f÷õÜ‡ÇÓ(ò=½°TòÈZTÔÒy1uá€f÷#{€2šg»aÃµ½a4"Ÿ’øÊ®êØ’ó=;ÎãÚ_Y2¼ ì×Ë½±ö%HeÍçÍN·ù¤Û~ÑúEso¯İí}¥Tê%m±>æZÚİŞiWk‡}S®^û°D;%üFÊ˜é[gú0ãWh®^è.Êø
+›0¸`+9õ™Bxş,™¨Lw%ü¬Tˆşò~c7pJEĞŠk‚DÎH„~PŸø”›ª%eí8Ÿë¦ Éª§äÄ‹²E‰ƒßü»õ ?\f[6=ÛàJ[%ãàJ[§®´±§–3Ë£ÄO­°«YÉ)çªËˆzæ3£¢ŸV‹Š‚É ığè”+ «:€]'Œ€u€¨^MµÔ.–´ÖP£Ú¤TŒêë÷nÍ×ç©
+4	Œß{^$Ô±5©Õú£»Ä¡<GçÓ¥]cSõÊ~³}î\„60PAÄf zÌÙ7Ûÿ9İ:õ0R#P‘,-à{”jÛ%\#F“d|0Ódd÷_ûg:óB|Ğ{íÁvqò“@ˆşÈhWÇ£`[1±v ãO.¼7KJŞœïå]ø 3óaå‰²†Ÿ~â¸0I5œ~üúß€~ÂH”z—–;Å‡°ØÆJ´	ß(HÉhb¸GU“Ä>£±ŠÆ‡,àQĞ•bU9r†£¨èÆé.á?&«o½ŒËjI»âL’©Áû‡ãÀv/¿ïOQ’~¿™†1#Û8p­7-'è»vyö!Œßóıwd„‘÷€s0Áœññé¾13ßàŸpñérAËöğ.ŸÎÊ1x£¹OVqÜ¢À-Æ§À-àŸ÷‰[0Mê=ç‚WbFFÑµŞØAXIğaË2ˆŒVú0fqa">0ˆ™Ÿø„A„Á2Á¼–íá]³2Şhî“UFàƒ(0ˆ0 ÿÜ2Qù¢Îu£¸·p™Ï?¢›xÖ©=œc`É#Åªûh&ò)¶T¢Âš‘Ò€vƒ|åÜ¸‹FşkŒÆhöû°t£]üºÚ‰{L1ÂNÎêIt’"""gÿM‚$Ò›uYkÊO&›ó	Éa†=tØø^İr¥còeÔ²ƒÀ
+d£Ÿ˜aeeóœFåmK=‡ÈªÚohöû˜'âäïğ÷×j“À>eLÿ"u²ºD@Ï´¼7šm¬Z
+ûÿM5jŠÓŒ‚Ë·ªp-½õ]ašNïC²NßÙıt†ÙİfWà\Éô
+aJï`~•Òtåyï9Ã)‹òxØÙ§ïRÉîmTvU­w5ã «\»Ø°ÃZŞ›H=Á'´]°gÂ,t&Ñé,"6ˆeVD|—Dü*ñü}ñ|Æ®¶¾y£‹¾)YP^ÜaüWÜ5Ş–7”2šÆc&±†àñĞ æe;—†î`¬"ûƒßòÚJ"bäi€œå9c¤ÌáÄñ`±cF¬'•ÔÊošh|ÍÊ/ó}-Ô2ö) ­)Ì’Ep‰“fã0fí¡2ÆØDèeHENéé|Ÿd#…†òæŞQ³Ûm’ö­î³^çy“`˜Óa{§½×ê4»íşhî4{¤ÖÚ?øeı Ù;j<õË%MóoU(ì›BŠ"ø(ÿ¨¹™X[ärª:tSÜK÷Wr&õÍ\üfV®L•Tä‘
+á‹-³Œ~MEí•jÅCµ&"‰†
+Çª•R8U`ÔÂ£?½å‹şˆ†á>X¤}æD~Ãw~¤„*—¹R‚òiàOçC±úI(Örb÷GÌ=Hî±Ãèò­G†u	h<ĞĞü4¸oÇ‚n«" ôIª¦µ¬_YI»¥t²Œ®ÒYÄÜà5à"ñJ_-FÊP=é~)„@E§,'S0¨L uvÑ+ûßııw4Õ6‰ÿ"‚¥4&- ?\˜À#æÇğßÈ‘«?*»­1Â$“¬½Æ“µyŒ J=‚ş¦Ú«lÀº€VÍä®‹Bš‚ˆAÉÀSlè¶?”Ä²6ò›;İ`É„/<¢_´Lvözğï³Ãn¥İ\Zà—««Ã%—šâ\ÆI€ö,'ŠŠˆƒC;œºQc„	Øú×äÔ
+Ñ†H?CØ¦A£ï:“cß
+×tôº\“wNk¨§åO{ğÔ±İAmX4=qäŒmÕIlÂ~³t—¬­¬¬hÛ‰|+Œá´ß·Ã°¶ˆ39œÂ÷` 'Ğ;İ=±&6l3]‡4FaÆ­ãĞw§8Ÿ>‹ÏP=‰÷N,m²Q—Ó	7.à¸€Ä…‹ua·Ÿ*C“ “boA¶Ëo$ÑµK¦Ç°[û6•M· ò&n`ùõl²œÎEƒ`Z„ç`jMYh{˜Au]„GIopcÜZzƒ«Doğ¡7|ª$‡}Ş<ˆ¡÷Šè<ã	K7AwP3±}€Æ°zä×Aúü±Ğ>œKDçy)Á7.P©x¸|Zë^~ïÙÖÒü‰=úw‘b‘cxß+ºPe´kÚâUİZúw°Ã‡n„†Å³|«ˆ˜° çBÉøGÎƒ”Ñ‰z¯Hæl°£/ÿ`ıœÉ™8Œ¤İ4%›@ã¯aPo-%‹;XMƒ‡n„’‰Ì©™õ“¤fÂ‡ÎE8Ã	{¯(†l£¡Œì®?»’–Âbe@²ÔÉ¼WVãOnùã‰kGıöÚ/º½å£Şe²CĞ]–”i¬ıqdMbğ2Ûx‹úùâQw‡ºl·"¯O_L%®Ğm%­¼Û•(+<s#„•&ËÑõv«Èj	M—¯­LLºĞ"6™º°ÇÊÊ’‡]‹yP^œĞ÷ŠğrĞ‡Şnóğèàû{mR'~H~IšGÍ?Û'ñ‹æQ¯ypP…&‹’á1SD™å¬xˆ^J<Ìòz~«ÈtêGªóPp ­!„Ãjêğ?ÎwK‹ıø"“LF:”ŸsAhGã½ª¯,”	…ÑyBùuˆÈ4ôkEç˜	~¿ûÍßBË¤ö-	¨£«e»S~|Â ZÈÑsm4)0¶$œ-íyÊùßĞØ–ËÑjN±Ã~à;ºVá†ÓËïCØŸ”H #´¡Ÿzfûì#íL‰xÒ	9Š…ê#<Lxb³…è*A¡¥kÿAŸ!f¨Ó¿ÿuqC˜rÕZ £³Z2	_ÿHÇ¹a6ˆá•éŸ.Œh¬Ÿâ‡Îx¨ƒ1ô·Ï_¢hn-/[§ñu€Dv€‚Ë§«Ë}Êçë_Ğ™½ü˜îÙÕÕ•3øÿ'+²¶?>·=¼öì°ƒÒì~O'"\¼¼Ğ÷Ér£ídÏ|pô·çCA@•E¯¸>ÚºvpàƒDôf{Á=ŸÒ=¨WìÓÏ
+„('Hb4h0ıÂ# X[‰¬¼ãv?ò¯´4Èé¸Ûg÷0yÃèÛÀ_<cÊ]É«„ãŞ™‰d­e¥
+ÂwÂ473[	ƒìJb9ëhl{LÌ3~üîÛ·äÈ™ƒ€:ÄÅÜ*“şPXhıJXgx´Ïe?BiB–x“íM-„…;ÉxÚùdlÿÊÈ;¶wê0˜2Eiø@¾.,Dû‹‘…ÍÉäÎÆR»(L¡Î¨´XŸØC„4rá•è)¤og­°˜#ä2Ä˜Ë]â#KÖÊaú—Ä±GÊÀBJ€GYë“àòíÄø:¶Ctğfì²AÒĞ\Ê¥vX8uKm§ä/Öò'ôş¤‹ùOZ3B9áQ.˜• Ÿğèû+ øÏ——€òsº”^eo(‘u•W=C”Ë^Ğäá¹¨¡ìÈ)£¸úœÌ²%ËUæ®3Érk
+ˆpÆj”Ï Ù\É›JRÊ„¥ar`$Â*”Œñf¹J~–Ó~•`¨%íŒx˜èaQM‡!œšeŞU­ÂK5Ü?½åœõ#],1;L1Ïi'y…Å63õ¤ç„uVâ]úe‚ŠbÇûAœ[Â9’(Ïö‹>³NúXTh±Å9˜ÕV¿_„6$VX*”Æ&wÅ†‡Îa»u´O:GÏIíè°Óì.İAÕòŸÿÊû+ï>°è;Ÿ§]½¸s—X_ƒRF"8¬&šÆ¬8Æ$FNPˆQ®„Ê´³-lşÇï~û¿;,b'‘ğDSôR£+ˆ±^t’ŒÇ2¹üıĞr©{AÅF-õèù¼åc…“÷áß“;Mö	bà(¼[ÔNc™e|ù6Œy=¶ÿãwÿïi@•ånáP)Bïà¿ûï<Dq'"¢wşöc«âÖÄgÏnÿ–´\ëÔVµ»ÅîhjCÅGÉEEm,{Ó±tíÆ3k¶ô2íƒTéÙƒj¼ÙN^Ğl
+Š][ş«åá]h°‹c-¾¶÷Ï´l|– ÍÍè£¯Q¬´&ª†¶7xLû¶û"møâ$´rU4Ş y–xı–éõ¥^4‡™~z†ÿºáOl¯FÇFÿ¨!Ş«2s3šÇP1b)=’İh4®KŞ0¦påÑ™ªu#Ç<‹‡»0òÖĞî}¤ÄÎræ6Ó¤€ä$reÎû®ßÕÆuT†vl É.BOŸøÁ˜€1Ø´Äãr¥H£ùoæíá*œ9?^HŸPeñH-ŠÌ1{P•ú§6Í·ÜíXò/M²8Ô¨.²o
+öİ·x`¶ó©¶D¾YZ,(AĞNaTa’Ø5ôi¬§Uˆà
+ÄšÏÎ‚A„¾aÅ>ŠKíçú’‚‹£ÔÖÀy¸­pIYÜ0.•82—Id·,Şƒÿ^Ú¹g¿¦%›$vN;©b´Ôˆü®ß·\»!GmÑëÍÃÅ%PzjfÈ`jöyí
+L®:q<¥`q¸<É±LF“!O#É—”É™œ€VA–@\fdåLf"•’wÚ»û >u7{\Rşá·{ÿËH—Ë˜¯°E”fNÀTÊ—yñR+]ÆÂe£h9–0ñü/ä ^ù úQ·öÀ
+åO‚\¤1„øwd;o¼âê¾Ö)¥Í–‰ß e(%1½eI²(•âQŞ¸CÿÆu ¨æaQÊ	xzÛc6V+ğ=Š-ß“ò¸â§â¥%(>RõR!ìÙT‚mÈñ	K}S"å9ù9é.'¶•öÖŠ¹÷‚c~3îzöÖt]ËœäŞ‡Mzky(˜¢á)Y8:H„—1Cİ«wÁ­R´Ü€? âVB9µ¿ùH)6Î€P¡û Á„uO4aA`éæWuÕ^É“ìu¸;åyÜÒ½d¸I=AÅİ$êJÉfzPe/ÍŠlth;„¹¢	ŞÀ³B4_!"9#4²ÙR«5
+ƒÂÉÌÈæ®g~¦P:(mÏxr6³»¿Óìn‘Ãvïà’!‡—{ĞÙ¡ 
+İæ^¡Zû{äyó°ƒøƒ=RÛ? 5dHk)×Ø<úÂäj']~ı4f¿Ù4d± 
+'ı‰‹™…'PU|ù3øş;ü	œ™(ÊI.¦ºS]
+èğMhÎ‰5°jfÄJ‰ÚÇ8ÆÀ
+^m/1Š‡İ©Âá\?Ãğ¹{±šÕ¿Â˜XFï‘õ$A±)ƒüòÁÊéè«<ôdN,–)Û(&s¢"Î('(E"Ì€?ò9àOPQFj²Pl`´:Ù­1@ä¸ÁC74(lìä½x®*?ö}×Âì ÈÃ1ï¸_(SyYlYõâR’’C‚ô#ÊBÉjÎ†JÊÈC{~øİ[,9™Ú(ırïr+5¢E¥•×+ååÃÑzáûóÈGé|İç«®Gø)’®s“W±÷9Ï¨¼ï%¿ .Ö_4	vV’ÖT¡ìĞ@ŸJÜùÀÕ@‚>v]Çì¾Õ ½iHNA¥CÌ)ôµx—oÇŒl4ê×$²D/¡µØ°$4(¨ş=3c´—°H^Øµğñ“üÂ.š ”åÀ
+ßÊàÓ
+2É§t^¾ÏU«g³PÆ<jMÛu†L,M»ú9âV‚‡>d®„W¤P&°•Ä®eVh™l“líQ¹¢%'Åğ€B1cíGlÿë)ğC{â2`ZoPû:À}4¦T¨ÛAL]hE]Y‹½ˆ;€ µøOÎ\Òb©!6ÔÀ	¼«qÀ6ÌF¿«¼3G¶ˆ–@¨Û‰-)ùâó/úIİ@lYÉ7Ÿ76@‘Œ^œ¢Æ2Æ'ßR¸Aİ÷ëå[ˆc¥”ÏqSHş9~İ„Ôãµµ¼<¶ñ)LåôÕÖÚÊƒÍe\º“Ñäq<`ÛŸkGòâ“xd
+wæ†ìâ*a'&î4|©î>Ú×”K>àp8Û}a…ÎĞÃ\t{*¾gQ3Ó@Np"+ÿ
+gğ"½ˆšy„©ßqÜp“x¿i]zÜÀ¡ÂêîB336O>·±ş§»¨èó…Ö %ã½\Ò¨ô2¥±Ÿã§fÉîíX/U¶#}Åºj¢*mPrVj Ò¨Ô‚ô¥OœSèBæœJši&“šæT]j÷'((s¶°ğ¨^')³,Š0õúÃeöˆ¬µócA´|ÆWåGù»)>>e=1ge¿T&¼L—©áŸ˜c7ôƒ7È†bAÄ‚šÚY¢î¾!DaÊeF‰`ôœš˜WÌñ8LÊf±2s‘ª¢zËı0×#híÚ^hı
+„×Xp¯LmDtá5¢!·´$1Ú]ÒÀ¶Ÿ÷e;]SÊVˆÍÜı3f¦~ıÂ£şÃoÈóD?´©,õÅ
+DIûòß"´¡ÚÅ¦Æq/œÆ^(ÊÙóe/ıèR2¥’6–(cŸ)_/ÛüV8Çsœ:áÔroX¹è}QQÇ¾HWGõû$ç^¿2›zŸ¯\à>°inÈ….~zÁ–¬¦Büw³¯
+q¨ë½@ş2ÿ«Ú2mŠL±™?ª²JÍş\½CMú.·/¸¶bbJc\ ®«ğa™„|HôjÑæ®Q1HZ0^©Êd×VÚ˜´üìƒBùÙ¢!_k³çÛK¾›2l…g‹‰Ÿå¤Œ¿ûÍßÅ>œ@Ÿ[q|	íTúUnáÚE]XŞähx:]œ"Æ‘“RåÔéyIx%ŠÿŠ¨MÖËäejÍm ×VàQ¿|ÛM²p0’C‡“ğà'©ÁÂÄ™Ùû!¦áàòô5óÛòD;Ì
+÷‹¯¦A¦IÌækûØ2j•w\J ÆiNKDi#3ÿ>AYÅ'Àï¯¨l•öĞ©)Md+ÇÎL¦şÿùÒÄoÿ·R*o§DÌ,œº)×æÓıÃİgİæag}šÍîQ5¡÷aîïtÛGD¾Ûiïµ{×äÕ|êãÄ¥ù=˜9¿¥"…õf<˜kæ½*.ÌwäÏLæRçÌÜÉ‡t±¨¨Ÿ—²¸ƒ¸Ubu+ºÎàûCĞÒQ·£!>:¥úÃ}ƒÏÑ¸.å›Ëk(ÅP:I0Ry“)*WèaaGÖRĞé>(‹Ï+3ÀY]••…0ëÌÉø+ùÚ+¹ÚFÚ‘°mˆ¸:„ªø¦:öşš=¸º²bÙ8K'|'1FÓIU	ºiÄ.«§2°>¢Ô´^ÀŸŞf–fî6y˜VÑéKÏWrü¢çu:V|\f?MÄ³Ôxô{45HÆ–HÈ,ÕcÓQ¸|‹úi,pg’Ûi†^äxS–!ËV—æ¨ëâ¼{í.æ"."ÉÃ„–UÙ3M¿ÈEkj5Ï4òG¬äÊ·F(Ÿ‡Í™&ƒÜ)r\±r÷÷À®gÁ&IiU; +º +P­ê†®îˆß‘tıÊ.i¦â
+í©UÜjîi¡I£›š:ª„Ní9$dy™ìZ!şãÔ šZ§+Æ[prÏ’…¬ëVâ/6¤ˆêÚ äwÇ«M1Ë¶ØXşs«E¯­¬]tüêZÉ¸MednP6¤ö£Ò-ÑFZ³ÊÚ,çFÕ;RÅÅ˜s¨Rf“¬#•{Ue©²?Õ$ãÍ)âïÚ%JÇœáê¼Ôó:’k#¹GIq|ù6‚¡güQÏì7¶ÇB¼àT`¥˜´
+¡Nâƒ}†!Ñ,Ò§æ}B3íõØª.Ø2NØ’ŞV}·äÅ—UÎU½èÒåcù‘årø¾Û*%¨­š«g]“T:Bİt¥"%©Åt¤ªè q6&Âƒ] Q%…9}+áj”{ï¯¼3  ÏgÒ
+ô$]³w0ñÉIOÖóJÑ*(5™ˆe&!‹Âx(œ­]°dIqµß±¸{JRÃ¨d•>8×‚á*yLïb(.üÛ¥SæÊ´Jº2•¼İÀ(GŞæ·y‘.±PµäÃ¯	”ÒACÉÄ†û+r—ègEç¬ù~%üôàÉJ]õ3
+Jk¥¥Ùı5'ğm–Kàc`ÏT©lOU?®1woCÌİøaÛ;½ü¾è+6th®i{s#LÏì(<ÿ1m±ì(ŸÍĞÆZª+…JQ§¼Ë†ƒŠÄÅDm‚\íOş]ğ3Ä‡UX—ß‡„nÏ¢V—œ^¾ue.~v€bÊàâH¿F§ä|ò	ù(ıÙAøˆÂ¿p¢QmqscqIgÈ¶Ô ±~è^\]Ñ=G²]Æ÷O…sø÷J™æ'‘”¾XùŞÒ¨Hi[:·„qjĞ‘®€‰$}‘jx§gAB2yÙ5v«¿şªÌö
+şğe£3pJ9ÒF($c¦°QÜÍ¸üa)Ü°\[ÚšÜ^Ò!Ê³)H]ˆB­ÿl(=£òå'z£Ä•ˆ</»ÆbµQs¡ZT-; GŞ$™ç³,ãI™8”Ä†¯mœ@äóÏ~n%Ä‹·bó-|8Î'ÿj´ÁâéMÇN´}zúÀµ»gÚÏ-`ÀtåbV·«Î·Š5qAc7ÃfÑh×5Ñ ë*×_Ÿ×RQÏB‰&uî„hù€8\ó`şÓÿ÷ı;ÒŒ&—wg¦8Ô‹ùÃøo¸ìâ{¸IÑI†ÅéK™jWæ\™„t<º+„Ó¸%ï’¡íS™Ğù†‚wOcøÎ»„Ùä©wÓ™0©Ó‘ŞÀ3aD³bá|».¼îù‘¥(ù ÀÜVz¶Ï?*LŒ:W@&[D6!Öl»=u\ÏCøåw¬ÈR‰uY—iŠ‹–0rv
+y»…m{+D¤¤úƒM5ÜáRÁu€Ge¶^(ÿ•ôtyµP½-´İ“¯¢jåıøİ?ü¤9üt(ˆ÷Š/‡lÑ¡ªÓ2J›‡7R°‡8<Do-–-Kêio1_úêéìad\“ıÆè·ı½£&Bù–5Lêõ(aåÖØBPWXËsY¡>‘şãzQ¯¤8-Abø,Ä5¤1LDj«è0XÈ01Î¬>å‘nLOkE]ÒiF§šGÀ¤ïíï>9lk ü•N	^Z/ÈÓÕMbŞ	¶Ê][G@±	b=‡”<ı)FÁÒl`õ”ˆ£1X[3Å¼¬”~Å‰IÉÈv'’R‘›YÌv,Çã¨^´ªC<İ£îqEÊ¶Üİ1LQº_ø7™ê|ùŒ×à{u˜±ıõÔ¥QswèXŒõ¡pÉƒ tĞ»¥cBØÁlıš_Ùøv€&ÒL{W;7ƒ¢-|Í]Óíìk·Òîé" Ò„0Š—¿=Üˆg\[º g†míhÒŠ/¿äh_¥‹0`#ûŞwTšæ2h`Kßš8Šj6®ï¼{®ÚtU›­’“•tv–ÉJ¾éY*ZiP‹³T1WóeRsNéìÆµ¢ûásW7+§5¦GÖuù«ù³©¥)º`(Ô'¿¦AôÇ>ˆxc6®(yÕWÈƒ~GÎ` j&e–u.>Sgûëúg¹èİb´ŠÂ!:‡¡)\VÁG¯¤–<\™èŸ£òqİÆ8¢ñ+[¢5 bõÍğŒÌ¢å¸”Ã2†÷&çÓhQŸ+– g>q\u]£2°Şñ¦yĞîv;;*¹U6­œw&à49ü©‹81¥¿!'Ã[%æÄ_¼%vqîY”™Ghûƒ¨“?ª‰:é„]IØÑNW*	}uŞ‰¨spùûÀşæƒ°3Ga'Ş'äÄ;.zöc8_”tØÖÀ0•ù	;šKÒk(µ»í§û{û%,ys‡LÒĞ<e¡÷GR/²#Û½üı‰ïùCáE"ƒ@d‡baHS"È(	Iä 3¤¦Ü² Ş¬˜’—C’$,+æ¡~KN~º¹Aõûëdcum}cóú³~œEÉ$>°<(ƒØã‘h˜Ş"D›]¾l‹Ôlq‰Á^Šõà1ZÓˆJF,_h+‚zK\¼!Ö©òâôşqàgbJTLå
+\ƒVoluö÷®‘UÌ"·õA	ŸI	ßaémÌQ•8§Ş…Jn¬•Z¶NjÎÍı¹}~ĞÃÚ=4¤¤Ê–KÃÍ	É¹ò™Å2aYg´îkÄeJ—¥Ë PtKË‹.ßz@c¦!ºôÑğ‘¾y4·†NªgÚC ƒš÷ê…àßüšm
+h‹ÏSU´¬ŞÙÍ®ëdÜrb‰ÎF3‹\’Ïğœ§€RÌ0­ ©üü¤‰tÖ¢…ŸZ.ĞkÏtÃb&],Ø»ásßÂõ]k~afawà>(·¼ê²ë/¿1‹4=,ïä }V=Ù%6+²WR•Ä>Ää%t„?ƒä¢Œ¤æ•9c~*úf[æz¡vhÉ7Z©¶dKJ“Ë7’,ı,“W¨ÙÇ”‡imçµ2µÄE€…£¢·]²Æœ?…H Õõ^Çi¹Çë»ÓÖÇpKcHgkq	ÓKt7³ûh >>g~€¶±ığdcèšŠ3Ô>czMâPrK¡ö¨BÌ.çBãqJâqÎ\­eècXÑé´[?~÷İ"¼ê:
+´tObş€IhL]V™^'Ò6vé7ÿZsaÏ=åëä³B§L¢‰¶ş¬xÄs£%&B³j€ñöÉöù©N„&ˆl/°l}=èø ¥n{Áó1[…:yávèEÚôÈO“ Q§Òã©H:ÔRu™w–™WBÿÄ[˜‹<lŸÑü0—Šbaë2µl™o3®#U²`Ò€Ö5²TÓ¼@ËWÏÍX$;‰(]Û"»m4ì]şºI0Š¼óyç¨Ù­NŠi-±üÉùà;
+9Å˜Ò¥†ĞTµm„"†9Ñ›ÒA§»6:ÜÂËï-:ÄÎ]ÕM?’Ì…J2E@À
+_mÓ€ë­vœ!RÈQM‰VöÁ¦ç°ˆÏ•ÔU•³|%AêZ×Y’ªŠpZf\½Şšfxåù—»î^~ /gf>ùŞœ¿dİ¹Ÿt'•5„¥.©wNÕ¢õ2¤(7ÆHzÊ÷˜,&é«±LË~~&(Tq9öM¬/—ê–ìôFAfçópZ¡}}EU†&>¶h¿8»J:Æ‹=KJßåº&B¸Éêëæ;·cìİÅKevœË¦
+p†¿ğÛˆO>ï(r|Øa¶ êÂ³Œñìæ vúq@ƒh9¡fè÷):€Z»“½4±Y$ê«ncj!XxD»
+;Wˆ,#2æ»Øª‚]­nJ©£€Ã§ådBÂ×|¶RÌœ\§„jê!è’Q59×V˜Ê,VE}©šbESTN]
+KåÏÇ
+S´ä”„˜îŞÑ €ie$áÃº|–=»å«2¸üã™c'ôø§±*Í‹Q\J…ju&n…üÊ³_“x]MÛÒ5I`’ŞÛ‹ZºÀëÍÃÅ%ók`÷ÕÛÓå¹-Ş^ìQ`[cR{N1X¶*¼áf—3ïeÒë/ZK·|5§˜_éºæÀ½¹QmeÇ…oné`dK svùë–/¡§¼÷?÷Õ·|'«çÀòPÃ±Bšd8¬ÆÙŒ+†€(YÇÉÓäÊó&æ³x@Ó¹¶årË—RYaï*‘Âx?úñ»ÿù¿ &Af¹¹!Bèòñ‘oõ‚¤¿Cg<u™ë»Ô€*g÷¾Şø£HI£lU­¢›fl•U<Ufw¨õß ¥ú·ß²BE]fH)µZJn;Ãeõu	lƒX¯0®œRôiÒ¨÷>ZïôDœ@7ûDı}Æ l7FlÀµ®
+K @'fïLÛ¦(M,úäáÓ'P“~rÉŒV§û>ü€½9t¼~à{‰Kƒ¼°ğL¾héÂy¥Ø†)Ñ9>{uïRänkó¦ö)QZ©z­zèsH›6^¬Zãe7wô\EŒ×ÊgT•5˜hº1Ä²aFx”„?Jª‰6xTL¶Áƒ+Á[¨…sŠéYtñÅEDÚ;´¡»6ÂUáş
+“Ò¾9`ã`]lñeX"Æ×éS9è&ˆh²¤ø»RI%¢4dæErĞ_ò²ƒ'sD‰)x,š7%Ä´ fÍ›9Ë£J¾3™3ñ`&M}Q¹Ø¡28[yL-S/^ê—„‰ã£us§½»oàúh5~×ÏŒP¸¶täÓ‘>’ÛGH¨K„+³ ş!1ó·„Uº`X¿q^ˆ¢ˆ=å/ú	tİdc>€Ùû™¤º¢ê”Šÿ§Nc1ß>f[™mğ0S†!–˜8“EëMb©%L	´@muıa‚;âöØqB±tpÇ…»PS™EÀF•³ŠˆmÌ˜˜wÎÄû•5a"*¿jZr‹DS’ñIQWTö:õâ¢Ü—ÁâÅÕ³/„ü¹Mşú€4c°#®÷§t!ñ‡ï§Eï±¹=ZBÂ‚nÂ:ZP´ŞÌG[/½Š:Åv©³‘lÑñèÂ
+b®ÇÚ$q,...)CGi—ŒCíNŞƒv?"Äîø(rÊ]åµâ!I}Èˆoå‚+cUˆ‡•ï*âUÛ`ÏÒİ“Xô(Ó³èê‹ıÊğÎs8‡éÊÍ\¶Ôˆ‰¾>è^â"¬Ğ’¶Ğ iz6Í¨–Æ§–È§bWc<ËL¦ekzTÄ—ÈÕĞ&²GN…¾Å1‚PÈ[šÀìdZÃ³(®³{`Y¹¼i:ó‚°Ø¶GÇ~íjÍ¾°&¬i<ÍË_ºZí¥õ–°ä"¿ÓÛçnê¥F8=Ùß+w±ö@…÷˜u6á^.€ñWYzÆ¬ÜêBÒS©K%ï4*ññsÌérñØDZmN,fÊå*—´‘ÚTs®xœ§|KĞÅ|£ó{IËÒqv“¦‹—íí}ˆ×±û˜ıšN~6{ä‡¿ùOü‘Ø\Nå·eÕq’—Å“µ«*”'iÓ¼	+ĞƒåeLtQ…àNX¾Ôƒ„*¤çƒ*c{v*Âêé¥Ê–uùÏfãSUÑLå)•ºC[¨$ÜÉ3[á3«ô_YCCè‡xÌå*¼§áŠ~)ï6Ñ5üÜ‰dy2Y ”“WÃúêãÄa…¯’_ø \ÕVH?¸üı Ëf
+`–|Ãzü†uú†ğ^q/~Å½k{ÅÆ¨¾>áoÙào©Ã'¥‘WzgjHï—yÚ?{ŠÂŸ.×¬¡­4e‰aK|VÖ½O›¢E
+½İ‚š¾€;}¡Av}4gyÔ :}Åæ7øsˆ¹a”²
+%au¶ì¨)İæùöÔø(ÃiLFdmNë®+ætÆrÔşª*|	 K<fĞğ¯¢Ù—Ğè31âåtùYtø«êîïHgŸIWŸEG¿ºn~}:ùœuñùèàëå^v½ºw·‚l}S«¶ù¼>v~nãŸ—@jŒ«4héEïF-=M2NpbĞçüGµD.i×7¿¢ª…`¶ë¶
+”—lM–€22¯¶‰Nğø 2ºà,œ2ˆĞhJät²Ï‘»AÚĞ;8i-fá.ß2lÁË·ˆâCË&£V¢Ğ(Z2˜ItkØáÄ÷Ôá®({Ïõ•ıâí³‰¿z‚!¿}‡öL¨à§}£Ï+ÄÊGXIpïj“Ggñ–ô?2Irä9YdJùâY½Ë~¬ãuşãş¸ÇP~o‹/U¦œ¯¨¨hb{¬vXd©áù¯©:"wÈ½•øŸU]µ÷ø(m“ä÷§Ú6EµÃr@Hùüšåo*p8³Ò4o^şMÍP%}?ù”~OÂ¢“ˆ……G;É>‚LÍ
+mxÕØX[åQfä¯JÂĞó9MR
+sé„eßUJƒ6,ÔŒ¯¤øVÚO“rÎ^uq¹MÃ2Ğ4‘L2
+|Ğì[Ïøşxjõ1>‘QY®u£¦ñ3ñN"j®¾U…æod¯2|–U!k]ÌÖæ»Ö'µs6Ôä<^X}Ã|ví†óÀá¯‹¥kİá’¤á‹¤s@·×W@Ú»üŞ
+KeºÒ>¼ƒ½oD!ÒÊ‡íŞ³İ6­?ù¤½×~Úiuö{ğ«KºÍ=R{Şé5á®ıÃö^s§y—´öwš-8ùKÒëàƒ½Ï»û½6yÚÙkîµ:íÃ}}æJ™Ø"¶µAÂ(c¨š¡áê£øŸ|"^Š77VÉÖ5fş¦2´(ÖÏvòeã¿2HÍUR	ıbA†&Ö‘Xj¿•“uxÏê3ÒPMZZ™ñ;K‘Áw‹E”ğMd]»*r•šÚê°ª6iÕ2îË‡½±D“Z(ÔàU) èUXôTœØh3 ô°¢Î¸L#T†˜UeiÆ™¬yş IÌÍ½£f·Ûì‘Î^«û¬³ÕÒÜ`öQ©QÄ”/ïá¥Ê„ÆXôï5ä–Õ¾ÒcÇ#tOaÊ—S÷[)Ë…f\¸õÓªËWoË’†5I®IüEög*ÏÄ£Îàrâ)X¼³×KMHI¯ÜCOq¾¾}KZ0òÎÀĞiÆ;J€m8CĞ61Ù™e5S=(±e²®,©œ£ó•qÄ–œÅ’·•#™‡mğ¨¬ÖE™ïyHèÏ›.vĞ£ÎÀ$húÀ;¤‡ê/èñVÏ®æ‰c|1/ôÄç”#ñíÙŒ´ø¬f€¯B(¿ıß	3«S)TiX¡Öö§§ÀÕÌOÅJxJˆæŸD>À4$%p–PmÍĞpbc…µËï}$x{>¡.7F WĞ¾x¾Ö¢]qêJİVâ&ã-J™¢ŠI¤ç‘?;ı¨ïÎ^|BÚ eïì“Ş³^ë°s@Õö[ÏºG Œ?işÙ>é6ÉAû¨C¯ vş¬÷¬yØÑ¨ÚùõÎV²	÷êUA$a3ÓÀ}A1<^X¡3Äz)ó,ûQl½Báu½
+CŒä3a[XºÊ³Õ?µXás4¢¬÷˜‚ØúC¾Ù:ê<ß¥©ó¼]"ò.×TÇ³’Æ~û‚7÷¤¹glMïÃ¼*öúyÒ9ºüÛÖşa”½ı£&³jµºyÚ¤ÖÄm¥Ú>W²S¬W³Slš“¯ß6Q¨—¸ÛC…±LBÙr·1ú©ãÚXK@cîH|SÔÚñÄa¾±¹°|æÀMŠo©—¥®â£áJÄoN–ÇZA0¸¿²™OÃÏ =§ó©‹óŒ}ğØ‰,üL,Lë ¢Qç¯ÿš|ùÕR²QóüÈŞÂqJ>ÂŸhåß {‰'P^CV7ŞW)¡ºá1ÕºkM­AàSa$0Ö0°‡ˆSáG:)\8.5iï!³Øj‘ÓrÏ~ëƒ.®jD|/}0_gºdiÌæå,æˆ§´b–ü‰g¸B©*™ÜÍ‚+¢©­-W‹–âR«>^jlÕGĞâÜkabÊaÃäêØ5:ƒ>î¤REÂ¨—PAÎÏïõœFrş³•¢’ÆÉ¹@¤ÂEBÉµ†´8‡†¬õ¤ûØú#µç?•xyŸ%!Åe‘Ac©^÷SJ‘•TFôa¢3]‡
+O¤5
+|Ïw/ÿ8tú¼îoJË¶˜×ï†T³7uŒóIx6İqqÏìïâU œÃrp5¢S|Î^­ÛpÇøz!ŸŞ©“y
+c÷ÒnÜ/vg[Ä›"k.]ÔÏ!Z :°GÎrÅ±dƒAı‚ôæZí8…ãÆ€Ælo:ô×'ŸÀyÜséyü5§*U¸~h0búõ9Q²
+aVYÓ:Çb·ÈqSB8.ãM*…¾…G.<r(\ŒêÚcØO¸jş˜ê@Ùÿf¦óìé-aM•Êt“|"ŸFV8ÃQÿÍ€~ˆØ&ôÚÇ`øõ”òÒ",)=õ(ÖpfVE8R(…`˜1#ÅgW³Ä”Ÿ®PÊ4™†"ÓÆwŒ
+¦¶&T˜/eA;
+¬p´V­XS9ğ7<ÌMI2·VWH*PàMIÊVSl—nJFÔ']X“…Gç	u¸(•1UÙŠ®Czc”e{šÊºÒL›L¤u“æè£¬VÖîø›CÎ“h­„0/)-Â¥Œ‰sŒÈ)q“¡8˜ò¢)TOº@ø0ƒ`¿QU°Wós˜^¥O²baáÑÄş§@!0'ªYZ4zšk=Ñ6®ƒNªş1…° ¨¡k‘ãD}‡[)5ã¦è†a/¦O9uj+¯É¥8]<¯TcqÇ®6¶tštœ›ñêpz<vvÛ¢™YQM#‡{xo3¯âX‡¢ß=‹ò8a…æDéE®åTŸ¼ÃDœñ iÔy¨áI6&òuóãw¿ûiÕ6¬Â‘«1Ì×8'Nşk¼Ûy‚‚±ÊVä³pÆÃöçŞÑaó4»GMÑ0)­;¢c¢3-	øV65´£ŞÈ²|´åÖ(š©roÁíªİ‚ÍÙŒCr£†Õ)P$‹Él²«Å…Z4»=P¨â9TL%¿tùNÎê÷®º†Ë¯Áå:A¥Õ!¥N—š={6CörOe~¦N-Ô´·g<í›–pÂ „½&yÚİ‡ÿµi`B³ÛÙi2c~­ÕÜ=Øï‘§¸Yàzo)×À<úÂb~#’º¤³uc´ÛAÉÒñ`e×©’@e³åû›ñQhÇî4@âd¤Fè>ø¦şåƒ_êêŒqÕ ƒZÊ–º¤3Ô_â ĞW¡Iıë:ËëYÉ 9¿¶’qeL`ótL4†PjËé..ùØ’ÚÓ	2j˜–‚ùåŒY[^×W×0ğ`h”¯’UÜÒLOmLí†i‘ğÛ‡M×¢£À±<¬tÎT¡µ‰*$ß{£õÂ˜ç}ú 6Y‘tö‡ßıGŒLËïØ^Gíú›{…>Ö]–	«9áoSB6sa^'“ô÷ Å¿‰42–ºÂ‚ÔuÃå?„Â9¶6c<qm¬$áú½5œ²t:Ò·Æ8ã»ÎĞÂ¸:äšÖ¤Ø*|yN¢”Ip’Mò+‘™t±Ë¹E,œä+JÆĞ[>“¯n£–>‚PTh,]“9'aN:¶;àö»üİÎ–ä9¸©…ËÉ™¶äŠ¡<˜¹ U¾c‹˜û,±Èdvl8ÅğUº÷T>:§Ÿ ÌÏ’nÌ|Æ­tú¥b•N Ê‰R\dÊq.8ååb2¼V2—øÕ¾‡›“Ë.¬ü„´ì  u+ÙäT|ÎÍRQò¹ÒKkïiçp7–_â$øßjµş—û×%Æ´0n5÷¬Sû†ä˜ûï@’ÛÖ¤U}yü¤V–q‡ó’eV%ö¯RÒŒPî¸XS Tù€«K5­‘İÕr‚ş­—i~üîŸşî‡¿ùõÿô?¡hó§ÿ7Şi‡d§yD3×¨Jıø–I6~@N¬S?¸‹XîÔB@QºsrË )Z
+¸øƒĞaÀ%it&C È}¼ËbO 0¿ß·a°fih\Æ³æÎá~’	Èóûöq(Ÿí‘Ş~w_ YÇi¥P)Mi6I²—àb5n-c­<"N°9K¶Uñ?¹U¡-c‚±rÿøŸcë2Õ¼jÚPL,D×Â£L¤¢çû—œ}…$7_¾ÏCş›?€Dá¢ìOš‡G=õ¾äÆ?_åE6à}öÖŸÏ@ÿš<;¦…* áóƒYfÅí*z~•ß“æ6ÅçıËµæšˆsÎ¹c4ÙŠ=Â¼V?šZ®!Hÿ„D¯ø™Ìğß*UÒü©ešcy52&ä»(rQrY@|Ÿ™¦L¨òãwÿƒ#N*ÙP;üß}ûÿÙP`9L‰şİMï5Î_êN¦3ù_É¥•t«O¤’2ªék9bYv¥ñÇeòäWG˜$¿(@õâÔ›Ÿ[ã ¼å¼'<x/}pQ€»(÷o‘Ú•`X§Ğl)2Ü+Ñ$óªk—¸iÕë"tÑ¹)±õ*ÜTzUbSé3-·éPÑå¹âGœĞ:víÁö¹Â°:“è´xŸÔ*(^yÿ&¥V¼máô}ñ´(%¨½HïÂØRÒ!
+d'70ÅšGEx ¢|QŠ ®IÇ ¯ÜS1õúØ#ÎÛŒ¦›Â‰ãÑ€ÿƒÃıV»×ÜÛÙo4dh²T-U@ÆÃGÔçÛ»üõ]’u×J[É/(•Sn¾{ cWÌ›}†Å[èD½úĞ‡#ç«…zôĞ‘UsW ƒïÜÒ¸»¿Óì’µ-òtÿp÷Yóÿ(Jué0ü¿DØÏÛíıÃej›¼3£Íâ 5ÁRÉÂxo%gaÇe-Œ¹X˜ÊVDE®ƒÉíÉ‚Á¿|°r:úª>Aò%“hÜÄª‹6Ä,ã°øXE#oß’ƒâfogŸ…Qhü™È×ùº‘Ş*½'«ê§·Ú?ü"½_0¦»Jo?šGf‚ÄÅ$7@n^É ).ıÎ€b”%1?xÅ÷$îK
+A³Œ^Œc¿ U”¶Jƒí´İ¤;”‰§	|Q&OÃ§´bÄ‹_ÑKÁ‚h’8óğßl¼!mnKhâ©F—¿P×
+‰æ'ïİV-ºxaËôhÌ[œäƒ,"ã­Tûy&i'áú»û=4„R<´İÎŞş!…D+&È‡%øEJUñTy°3”à©4_ÀmLâSjÔ~ÕÃK¨ ¥ [
+83–P† UĞ]{€oƒ¹ôàP‚°Ko©ñK¸’/¢Oã“asâˆŸ&Â¼c¬ÿ"ªL{4G¤&»‰JiEĞ2 È/úiÇğ€j2€4ÖM´…N±›Î~yßrûSÜgĞiv¶å‡Qüú»…Ó4FÍ Ìà­q8{l±ãÁÅZîıwD6>ƒØA):[áÄ2›Ë·ø	±3¶Ú±Ã6T\biÛÅO‡õ}Š…=ÏO
+ËnÄa•ô%Q'„ù€&H 	qîãË¨¥ÒëêP¸•®ƒÂestìtK€Şu`›õVÙ“	ŞSîû(ªÆ¶t<>-¼TÕÚĞò,¬°ƒÜâP
+3TOVY=ûbU{ï ³³)aü,ËôÚµ¢Qƒ
+AµZáµËñÍKÂ˜b´®”YšÔ)…¢Hıê×§{‹ì^şq «™aºÅ\§t
+_â¡U'
+_há‘±·µ´„^ó ³d€*	B¡f¿B2s)4NJõ*ŸáX¿VÔ#nÒõkàbé»ŒBË¦ê3™®tKó9ñúÁ¸ò‰5u£g@ÛÙ76@æ)ÓJÂ„Gş+Ö‚/	ı»›{¹¡¿!ãE¥
+4xµ™êŒäã–0Ÿ¦gØî–¸`80´éIÎğ·rC`z,¢£»UoÓshZİ"/?>{Ê‹GPÊ¼ô²dYœj½)ıV‘­²­¯}ŞTÍ%ò­0j8Ş‰_{¹Ãc€<ŠŒ86Óy¶È‚d^êS¤ÊTÆygëÓ\)3WÆÀÉZ4Ş/¿Õ+L˜šÌkJîhŠíR1UËèHM.ÕdÅp0«„i¬]ç8°I­çx‰ü°TªÎy–'Ñ24¦4ÙÚ3™Â3æª3p§ç	ô=²¾•Øw„† /ñÅ‹ñËñà7[2„Ò©åPnşnu©™R MJéÂ+ÑÄ¦vï Ûş¼ù¤Ë;:{-´]nà´¤?EX(€pbh7Ë¤e1şû€š¾h)%¾sÇ[5aÕ¥Â9È…„‚.<‚OµÏ`ì<½ü>tàVøå/uRÀb$ªè†%F“ˆh‹bb®ºšNB¬\Ÿ£XP‡kO9Hœ2bÏt2(#ó$º8´\EÈ1eh‹\Äto†%@?J3…÷Æl!3Waº‰¾¬@Ü:Š1mj=gæ¬#ƒ<Å~T$™DåDps©Å–1¥/¯l²&"[ƒ¿®†›3ìÙ#ø¯ {ÍãGìuÛ¾Ì¯µß;Úß¢·óO¼¤M´/ÿíNçhŸ6ÿÀ&êäãót µ¨²¦*må*´Rÿuõ8LeÛôÅ‰S¶R¡$qjƒw±TYŠ{İOyÒIÌ“€íºv\8¤!Ê¡&c]¾Ev<§˜B…Ìšäl‹²²/ZKjàWMÒ¾&a_‡¢ºGƒYÉ”Õ™ I3q¾]Æ!MGMv «Ã²fàæÚ¿j0_Ù†2f]‡í%”0Â»&²•^Ë˜²l8Ãg™*]êô=gX
+Ğ#z"¼fè—ß[äéìP<³ôTRí¢ìº—ŞPáŞ°ôœÿÚkŒû¬qÇŠm§§ÎdşÂ1¼Eb=%@iYTÂ_Œÿ=;;[Ô³s×H8e€LĞ	¢-¦¼è2aeY‹­ ş’Ï+š: Uk¿@Òæ®D0ÄúYX¬¶Z›8’6yøjHÚáÄF÷´mêëµiâ
+Úb3m4â%°´Ñ˜—»D=›â×Ğ¤‡(k9ÂµQĞÿğ·¬ˆd/w¿v¡1XóØÖ·ÿ@ë030‚éRÔíÁz§¨Úÿ+ùâ‹/H­9ph•XßËm Ë uÄM}y¸¥øMŠçˆ®Æ„¨V½ÈTNh’ˆMŒ&¢àÓ1İãj“nèŠæU¤$¤©÷~Ó«ƒÕzEyû%…Ï {û»OÛ[ŠÊA¨(½ÁÚ?×4ğÅh¦[¤ˆÄ»+É;@dà`u#+ÁE+¨›ş`ÚÌæÈóÔ~¡60Ìl±ü`­”3X+«X*K[6?X+ß¡µÒPaó*Æ;©éNQ±Nß‹Úód]ô(šs’ h+»ş n…á·§_Z^"Æ‡‚Ä]qëEAAİl6íkmùËµRğÕòğ.ÖJd)CwDÂ‚ïû©omq¦Óä–¤µçuŞVà6f#$œœ…øÆÖ\ÇCÕ™}h‡Ô‡nÑêC[q*éœ
+C&`û.´4°'xO2¸Š$X\eV…MòY¯CÚ=Ò:l7iI¬n¤3R'»S-Õøa £Gô»8XèAÒÒ,ÊS ÂšÒ«üÑnåœ]m]%o Œ5£4-©^¢’¡‘š–¥§U)j¦j¶yªÊ£&´ÏTQ±âÀ´RÄÔ oİJ'%e3‹6Zg²6Üà> ùØ?İ}0ò§Á·mîÃ.øÉí¦³ıt·š›Û>ˆUŞáJ¡òE]<À|Xèc”@ãŠO4&ÚA2t#uOaŸÌè#]%áx«à2%` ­yoEƒ›Ï¶Ï‡ÈŞŸ¬	ğj¥Fn+›,Ô@âD)RÃ si]YFÂ"Îø5ŸÉ>·ìÈUV]o%íÈ”kD”?Ô¡ïñ»òav`÷TËZ0`Rµ¶àßÈgê]“­VKoåŒ<ÍÑ
+h04Ô'®ÕåìƒâíÙƒç´C´™/W¾"Ÿ’ı;-FígE¸Â.„®]]]jüÊw¼ò…­+Y^
+c¾%víúì0l…,/¢Ôd>Ìhã:|DåÍ-™„ûÏyz$5qÄqèĞ"R#nç^~ïÙ’Üvs(Ü- ù¬–n–â³só'øïÔÁ\¢€,“C ªó¡û¬·"ÙggDªÏÎ|&ùÊò4zü ø«³R|šıÜ¿;rOü­¿yZï Ùºü#øË€~øÈB(«­×\Rª:»>j8O‘›¤1Ï)Èß-
+:Xxdè+§õ×]…2–54äI"ı=×¤ûyQÁYià;§€úG?¾4Ù›-õÕ¤É_;İ›İà2c\ùN»÷yw¿×&—¿Ûë´öYõŠŞÑ~ï."Áwz´‚Å/É!"É=é`Q®ÒäEo‘ ¾g#+¸U²P½X;¦QB]ÕBé	]ÇÙóJÙD6LZ5lÇ‡®Ïªşa’7 &¦8<Zó—ât™,×™±‡Ójz ¶eÀ´Ğ*ÇH(¶çZß€x¯„Î=hDÏbŞ'+cáQ<F,;Å,•kfAei¼úë”5®yá”U÷ƒËß\@5º(xŒqKánmz)V´fÂÎsøU…3Bÿ–Ã™&–HÿÕtåk˜¥0±2O.ÈÌgj’êWåæ şñy_şØîñôÇkæsºÂI]+•šÍœLD³“¡kÙ@|ú
+ƒ8ÛTš&sf¢w^ I»]“œ3!ÍkV°ê3ß-›Şês¥«U½B+Ğ¯™XöªX´ÀHo5|Ïµ1Æ¥«LpÏ_
+"]ZÆ –è?>/ ß=â¨,™ºÙ%!T« Ì-CÅ/^jCo‹¯¼2.—"(àõÊš\Î¦bz‰İ~hG~ sU;Üï,!RÊ ç³É•ŠUp³OÈ§ç)&ãÅ¿¸Æ½_é)Ì}^ß¾XªiŠ?·ùKŸ[;hşù³6+—˜ –Ãõ½gÍîRitİĞXºP¥ğ’U`s0!şOkX"²B"7&P?Zë—>gF	ÉaAô‰3,R)¢m% Èæ"~¹ ÿˆ?9üc_ŞáÙ[4ÆøÑ?òTÏ‰§o?)&#>İèS=ÅQPÅ–jd
+ÙFÌöj+DßÍ^2]) ¯f®Ş!ßu­à–\İ”!®¦GyÄ¼ÒxyùµÅ§§äSÜ!;¤1&*]›úvèØ½˜àxleRÿ7f‡şÉÅƒéœ&Z3¥ˆø<‰$·H„(ùÒd»#îMîFä¼x×Qù‹%Rg”b‹L?F±D\Ğı§XT¡¶¶t±LMÜb	°Åw²p´°”Zc®âŠÒÈ{;êä¦Z¥€&A6ÜóãDô,M=º÷ü‘Ö\=ĞûÛ2P‡çYê‹)f}}ZY&¥¬/ÂöM0‡pGvàúf‰Ü¹	¯—>©áŠ§Ï"ñ½ ê?b¢{Álb5˜“iT™gº¬3µô|âÇ¢ /C/Aè¼gfß™4¬0ªû¼4Ä*ÙµCU+Uàƒ®<è6yMûÒ/®º¡M=ºOğNRY¤F³Ş­Û×c>«Û×”jt=~ß2nßùL§×âG½ñ¨õ9zIoz«Ğ¥ŸÈV1d#İÊÂS>l<nİFI 	~Äp+·ˆˆğa“Ü¾MÂj–	wÉÿ4öŠ)§o†­M>Ÿl†Ø$¯…¨ö/ª%ïQU’Jk°ÌÄÉ‹I/ÊÚÒø‡Ü!µ|},ÁNÇ>I‡µüBh¼.3ª{i‚Œe¥¶å-¼Ò#”>x‚×›[L}4À=­/W{ğñãyWÜzJ`ö>ğovÜ:ş½{ùöŒ;évo¢Bùô(l"ÌÊ¸öû¿“$òa;±ãÖm§êWà˜ 0ag¤ög½ı½w`c÷Éâ—çÂjYØZ»»@¨…­Õ‹¯Ô®2éÂ¯ â—ã+4­k±ñ ê§–FéÜV©­x:N,ÓÙ;j>;8Ú?dù{½ınÿÜi÷š‡‡ûİn£c$Q1†ªÒ#+Ä`rßµì`ì„´@à6™†vp'YMs0v¼E\5’óÜÏĞë<-¾m‰Æ©½¶ƒì2ì>e%­ÁËÓ·ÖXsÖ8Xã¹,.)o¼#½Ö³‡Ó 3(™Ş}n{‚ÅÁî=nØcËqY—†ëƒ•••Õ9ÄS˜¸*‰Ç’dÃµ×Í‘WÍÖ·•…Çér¦KÄ€$²)E‘§jÜSEĞJ;†ÿ *A&°N‘r­#¾bnŒHŠ?ÛT$q(ÉÉß}û¾€0€jÇ­ À Xªëƒ"5äy®¡ìÖ®O«ã vùvlG°ä'äæìZŞ ~÷§Í~dsÔpˆêÎê²E,1°¡ßÎ)¦¨RÂX\zĞ¡ĞêŸVçZG°Ë_Õ5È3ead÷_ûgjfHï°ÛçáÈÍ÷Éœóÿ  ÿÿì}[I²Ş»E¡3ÍöŠl’İÔ¥­–@±)Ïöİ”VÍ •$«Éš)Vq«Š}™F?ØÀâÀŞë‡µÃÀ>èá`aÃ/˜ş'û¼?Á™YUY·¬äE—™±ØiYYY™‘‘‘_|‘Ø¶N¤;#gÑ°ŞÆä¹Ç¶®ÈÔ0Ü9÷ƒôJº¨<$ãŠ”Då«äÍUÉØº‚¥Í·Jøÿ¥xŸmzSµ²fó¦.£&~#tÏŞæ—`Cğaê+¯×Ö¾—hnşÂw¦•×}şoL™‹]óÁc‰åËâ±7â—Æ•-ñ×Eø{'í 
+M¾QD×s—¡2k:×~Ë¹KĞlÊl¯nµ{İ—-¼F!şö»İçœ-¡\¿fW÷[»‡Ùu+c"Ï°«¿ú-y=Â[DÊ5¦I¹25Î"/%Zß†9û+ŠTQá¤ÜŒVä@6ˆM9$€µãÂÁ½ˆúKÎ^Eº‘øv¬Ç«òHE§67LŸgxF© Éîn<¨‘IQhöŞ*aå%×4Ç\ ¶§÷0œëfÄ
+*2xæ°sÔk7 ÌÓ³OÉóuAQç¿Mö¾?ó}ÇVô…o‹üg*¢Øç,sğ=lsÚd)Sze9tØsÚÎô
+ì{´>ªÓ0Ç…µ³›)Áë»5şÆ£–Q¹s½s^µĞ‹…ÍÓ•µÓÀtñ>-j½:ë1ØŞZ*GPÂõ’nUùä©¿Î,ŠÚ0€dì²^á)i²ñkE»bxæ	ŒfO:Ù/|¡ÕBµZ-gfd Ô¬‘'b+¯2‘V¢ølË0üCÅõ–„ä9r-q)ÿ1Á/Î¿à7ğ›âwNÀâÓ«ƒÉ÷“œ/ª°¢'eÆ¢±7ÃzûôŠ³¨Ö¯O é‹ï0Ï ¸ÉÔñAj}¥ÏH’sˆ×êëÏÊ°¦˜O^ê©ñğWQÜ­HNÔEhoîr­HDQ6=7GÔwÜêÀ2§}v¯ê…ÛcvÌrlC(h‰ç2x³ÁÀğ¼òÚOoƒİqàLMÊ«M×§S:/ÑûB$×e›Ê'_;çè„Œ'$+2˜² ø]±Ë÷s)ÜŞoÜıX¬xKGËL…Á-€H¡¾Ê5ä1ÄW>³œğéÌwpAVÆ•×u÷Òw&yÇ²úTS²&ªA1	Œ\Â‰€ Gş[_Ïah¬ÄÈX±±´q±¬a±œQ±¼A±¬1±œ!±¤ñÁˆ÷j<ÉhX±Áğ¡Œ…o(¬ÖHP’q[;h¶ˆ•a¢Icin0–Í*¾ó‹¯ÚX÷ısèäÃ„NWÔşÈqIÊ¯ÚÖ¼Ö)°UéxŸpäD,sAm¸ÔR\­`qáioØ™På9:<é‘ÒØ÷§ÛCc¨N…•ÍÚF»{ƒ2Ë|Ã5À&³wm]V§ãi‰|óÍ76¶^’ôãs4¿>|q|úÛÎ×‰o™Û‘f,ş=,¢ïéÈØ¹“Á% YT¥îî©`n(İÄ[€}†Zp
+*¬™Ç¤¶ÃXª—`´J5¸ıMqpi~ƒ".t±å!şŒq¬‡‰ú5_Ø›‚
+ªç3wj;¾áíğZ²§íÃı£½Nïğ´½×íô:°¢z/1íûÎuÚ"eQÊ4µxìÔî¡ÔÛ¹C¡˜ğ
+ñ³G˜ù!Ô§ë†›Š–/HØğó^¹pé6’ëÕè2öšyª,ú2S“…_/ªÈÂæ×cğ[ÕÖñå—ê½ƒ)¶'…º*ëfĞØ‰ÒÜTés”Z÷„í¿y§Öåôil½À­oÖŸ˜¼4-¦C„®Eğ™Œc{v%ñËûÁÒáŠI‚À>a	¬&ceò-·øQx\/%ß+=ˆ×ñË²&N¶H›Nú¦ã1†ªcA á‚dç"í»¾“Bfë¨GHp._KÌ_ìŸÑ4¢O±³èGò5úánkln“gİöW0×kíí!†o®¼„{ äû·?¾êîã!ş³ÃõD[+é×”ÆSŸh3_B.Ù­@2bÚáWj(˜L‚°HEş;t)\™Á&6QŞÊù¡òz«ù­,,¡i<†İÛ2ÚÈNÜ²‡'ôÜà}İw†`…wÄæ5Ñq’pë
+jdã1ƒe±	ëB,HÜ®.˜«'6®‡µóñ·Äƒ‰Á¯O+÷H¸É]ñM.pÿî‘ôÄêÜÏE£yZdTa¯œÁÀS°¢æó¸ã+!¾,2µÓ¼ÃŸæªƒ -âš£±ÿEï¬ò@Ö1áÔ3‘GÒ Ä9ì$g¼HÂ°Á	°¥·ãzzË7}Ş*PMôœÚ`Iyéà+20\TPgæ`Lã÷'µŞ£W›zï&‰ÕŠ”Wì2®øé#;u2|‘
+\(±kŒ{3ÇÇNãP’mOã”óé9{(-•`É"Ôä2±§¾ğİÇF§QKNÎ¦›öÈŒäà'“Ìé	s>gïwœ¯\v§UzügŸ¼°MdcDºeQK©{Ô{™[x4n¤z…Ê3³KYE¾³'´ÁcKÂêM>4¥ÿ«{Ê#º¹.—»VÕ¶¯Ö«}Ó§Ç¥`ÿáZÀr#š¬¯¿]¯zp©\l³_rÒ<Ã;·oŠ¡Æ•b¶‚zI.ÈX3Ãœ‰(q£‰'ª‘p¡¸Ï8üµÍ	÷tfyY¢*úØÕïn,C
+?ÉÍ  ÊbRBÚ}:6€ìÃ·ü0TF0õÑÆ¸¡±R²"§œıò¤×ÙgIk÷eç¸×9hw[¤}üş³Ç0şÂ$9:>|º?íaí…¤&ÊC÷óĞdé­‘Zp!™:3-˜§©J:øœIõ *RË
+ÕÌ•‹uI†xT½«‘tú£’]²’7Ôj[µT8™	*/á)±:ÇuA‚éURW•L‹o†Ğ&y¥'>®R é2tt4D¹«fÜT0Y+Áø¯ëuÆ¾û·?ı÷ÿ÷şI–×mfE÷Zû(¬‡°ŞşÈ¤µ|7ÿ7ë°~šùQE}áñA‰ed[+¥ÇP•É¡7z<ğ1ü÷ö¯.°‡[ÅÉ¡ˆfÀ54œàƒ°ÿô.9£–Ï6°û‚D{ĞÕ	ÜLû3½!Ù§¶ñ rÜ¾½¥F¨Î8_.`—‚)š_úi^Ç8RNü;7C%ÎŒúIVJ ŒN^œ´»GmVë¥óê¨{ÜÚm‘roF&{·ï(møÜ°æĞIÓó^3¬öKşuBUÏØÂOÙ½¼2oæ•¡ ƒr¸şÙ¿3—?û¦‘QP&p²Á™g;|—œãbÇ.…ê AÏR2x–©'tµDÀ!]¨òuC–fH¤è”ÿôödæ\sÊE¸s95]´¶›¼©ÿ"9Ç3,ÛºÌèŞ‰*_‚ò	˜Áß.E3ï÷3±EˆÀõ`‘Â6C^õ^VIË?ù]Ì•¡SXš‚œÛ·„ı~4ãÒsÓÃEŠ¦`Uº°ºÑDVğÌõ§>¥*ş§®Ï<áD¯CC¼Ö¶GÅbC#zİ¬3ÑâQntIö>KK‹ºÈK›òzGÚX€Î’çYcãÍ¨?"æ„©‡˜°kü×Ây#{‡íß¾è‘“^«÷â$WÁ•òtJ• é=çªŒ®š‰íxSåS
+‚ã¶sNİ*Ù¥>WéâÇÎ6ùİ˜ú^k:+^Ùqı6ÿªkŸ97„‰†k°¹óüÚ '®¬¦£…yÂV©uö¨>•yóæµİÉu"î?6zğ&8ô±A”‰ms|DXÜ·ïúpİc›µÌ(.%¶Í±ñ¦°!rÙerŒ‘À\RáÄ©Ğ¾a{ô;‰­™›æğÉ
+'$H˜}j”yZ”pë"X-Öˆ9%üd§S¸¢2ƒìp<ã€Å¦hdŸ=bx|¡»ëâ
+µ˜æ‚<f“Å4\†fe,¯¬]¾{°Û}Ùİ}G¯õôig—œ|~	æ-õ÷NHyßô@ñâ˜Ì\0Øb­²3TÔğ®@\a.E+Ë¸U‡_¤-€ÌÍ´ rÂG:uhÕÏŠ›(cşyÈ€Äšô¿…»„¹õh¿¼†Şk \)‚¥«³ÄõÂd×@}¬)Š…ã#â
+rb|'K•Ğø{pÔ{—Ìõú„¬ÅFÿaÂQâª $¢NLŞªe?z;|4Pè–æŸï†Ö~º¹ô!TÆ.Ú>Xq›lÅáØ¹+®…Z+#È]jïKğÀ¹¿•à/CøÂ÷ùµ \½¸Ìú0GlxÀkF*ˆ»LQD¦á6ÊŒdÊF5ÇXıì-ÅÂ’ú¥qğ:¿vŞ³Œ“ßÏàIqY~jú·o1’HÚ`Ş‘>b[¥¨æ/EåWúµËcæ™@JÃ%»P |.­šûqĞ}Ö[ìV÷ sLÚ­ã]ò»nï+ÒyÕj÷ö¾&½¯:ä¤µß!à2ïÁoî’§­öoŸ¾8Ø%½Î«Ş‹ãiğF['½tÄíƒ=i¢ÎÍ¼ŠÎÙÀÄ´ñ˜³VãõßãÎÎh[O1]¿ÕnwNÉ—¹q¼ßâ¡Êçxiğn2øòd|T³&!^Œ!b¢ZUøOï	/V%6lQ¬*±G›C2ëd8¹zL-C<%øs®'œ£øf´ó8—^Hõ·Øƒ#L³¸R°jZ™U­ÂVX"©ÓQ3Á•ªÈQ·ÓRh”M…‰6ŒTVÕä„º#[ûX	_º"?ğß¥ã:Rû£12±ìd;ˆò±üõˆ=ğ›İ\æ@Şê}á"º\jı	yƒIo{cã‚V'ÆÆëèÛªZÉ÷~gúãòZsk¡|Ò½ {á"ùtíAzÙôTâ¨ĞÛ§SoÏ´¿Ïx±!VÅÀ¸œÂ¢™Q+xÃ‘HÕ´Ölhxåµ	4U9¨bNî±lƒ¼-œél{5²^Òé{ZY8=ËœG	[š”Z:4%[!Gc<b›{6s™E¨[ÿØBEÙİíôº»­]ò5ßÚ½Ãğ°9;Q'«û
+T×\^™Î/o¢JŠQœ²ïõ°(y´I&‡¢LúH†ö÷?ÿçÿI˜{ˆ+;xÅslji”Í§Fìè(:•0ŠVçÊObZ¥ ¹¼AL×:6¨¥Qvµ¨ÉSæÙÃ»•'Cã6ëšrSË€	Apàã°<ÚÚN• û¹š[üËt[l8û·=7µ»sPx"…ı[pâx5ìäDÉ›ç„Ÿk¾*K}§yÚ2ş»ÆÙoúFïÎ1·S:ub_Ò»É5¬’í8S$Å" æ3Ãuó	çâ0(á®@-ÉüÁbª>±ô<9ßÌ,[Ü”ğïÁÅŠ˜úFài‚Ä™B-W«ùø°”ƒ­78JÚÁóë¾éâ!Sxğ44ˆÁ©ì…¶XÂ¬	Ÿê<¡X2ñ<RG47hq›
+îÂ •bµRµÆöĞRñ¹B^NÇIL“»Ü¼Ãıó£“•¼UëÉ(~òtJıúQ´ŞíÉì‹Í4î…ëÔ.æaÅ"j°1ÓïY
+Çõ¿®7ÙuÁHÊÌ«¹Vx«ïÂòõC@
+Â/3÷àd®n=ÿıÏüyi¤'=leKœ7-ñ›s;&ƒƒBÂIh&'AÌÔØî^zçÎô»ä-œêoáŸRrf·D4ã‰¤õDT5.oà=C`;‘´|ºcº™‘ÁjL¨.Âmê'¥ÑìÈ‡y—(:ºä	±ÄêÙ À -îÆ¨eào¥éšáUZÇkwÉõ^m“µFÔé¯‰Ú•±+Wuá‚¨S±Æ‹öÅï1í™oH—
+ˆ¸øg›ÉúĞDtŒÙ·«¾˜}wCùôé;'G/:'½9¾ıñ¨‹ÌCÒl§©§Ò*àG—Z?sÑ+àÇ3|q’Äg=!©ç¢…qOÏ '¤£;,”éom³Œgóc(ºÁ`Vºw#·´¸eg•}wfŞªLvÇO.¹It²QãIú‰©ì¬+•€*`‚‘‰‡òË²Ö¹`Á¹V~ú¼8,ËİÏ/Ã|„À$Õ8’3qnŞtö=üuûvj9`ğœº&íãQ;ª·o'&r%†Op(–ïê~ªfÅ©iÇ>ÇG‡=>=.
+Ìm[­Šxøo”[£šJ@©“Â#Ò wvr|¯sÂ\øÑLïö?¶0- Ó²>G4şíOoY‘FtR&Ä`‰¼òa·œ,kŒ0‘ Ú('Í-o)½é|V
+“ÃVó‡ÄÔUl²©FríöÈâTÕõHÛè!BX××³ğ3}€Ÿ¹mü¨aÑy ¨âMœ½@ª\
+$)’\ÒjµpÇO,Ë7(N‡×R©ñ…xŠ{$^gß^2YŒPñ:t ],›;ÿ®¯øiê´6‡U·ÿ¬íûıbš†$]Ÿ›z`GĞSªx£¾¯3ñÕTÜƒîÜßşıÿÈü_¡g§çÛ±ßqÖqW¯œ§ÂwF£hL^â™–é_å)Í»ÄX×Š<&´—*ZXñ`˜mƒf–O5î[¹´<ê\‡ggñ<mv9vMGBôt×Ï{–Ób;°¤÷Ä.L?ïÂ$¹K£ôy'Î9‹â¹º#v+\œÇ{ä+ÇóW¼ïnØÃ0|¿ÉÎP¼É6¿€UÃ>É5‰r-Np¢ƒµ/|Êq­SÆõwJ=sdÃÊşux$©×^L3Ê¢ôvPÂ÷eu¤<^ïAIf±%eÜ²r%¹ğVàÛÜæ%ìv;äeç ×:!_“cüãiwÁ
+?|d”HNõ¨û9#yï#R‡ßªÜV¶ÁüıÏüOœVó\Œæ1è çiÙÔº}‡¼:…äØE¸RèŸ›2®tÁ0ß‘ÅÂrµòÙC†\ÆT1XåÏ§`à°˜ÿöd»a44ÈK–rò+kâ%wñØ¢âpŞÙøRlìxTêíZBÃ‡0xFî+²$ìgÂO+¤Nöoí¦H÷([¯Nm<Üß »Uà/p
+/d²‘ŸŸÉÃZ#È-RhêğÊîáŒnçL$¥Çw®Ã|mØh­4Zlóş\×Sd,†Ëéÿ‹¯¥£ í%*3²ÚÅ”ÍZÙT.()á%Ìt	Äÿ¹aßş	¢ØrêaY¥j‘µAÂv?ÄJÒ£8Dk1áfåDó˜·˜òp}±$\^OÖÈG^]ÑÚßh†+LºXW¯2±ÀäòÊhÁ—ÚÑâ-.nÉëò¿üodñ)†‡tÈø3éw­I!v[‰%ĞE)rj¬á{a~¼O$õ¹s-ÒºïæMı&¸Â’ÄŸË®°k9í1<He7q\‘X—İŸÄpª¢çCŒÀ± pß&•;r—WJ*ÀæE›ärÃ£ ãi.4:ûµ…´\—ËB\6Â,Àuòo	8³1{†4ÛåÚúÍ?¼ï+ÒN«pÕ¶¶É~IüOnÿĞbLP_“—İçœÕïc»iH¨Wœ?ù“÷åşÈ‚vºqp}I^š#ÖÀ(’m7¯ø25À…]QLSâí{f2¯(F
+ÈŞÓ74bœÉ]¿I.øKOâê’)„­hü9É$‘!"‹Œó×ePG²ú¤ÎÀ7o
+,Ãk–]âƒ^ñöóq¯rÿÕj¤ :P¤f>-±Ú»}7AMÃ ¾¤S<D:ÑDj¾Ât¤Ú2±#µõ©­²†7)Äsêg˜_G‰.1i
+¿/ö¦3¹uåÖQ÷ƒÌXGrNX¥˜¾Í¥zîMëÑ”Û¸DUÇæ”ÿşï£LêÔ‡q²ê“­9&şĞf‡X°ˆëBú?†;Î§ÏÚÄSt˜S×­|j9`æ™¿xPòdQ­.öƒn<a°'ÙÇ›à!jìú½nGÿ*åL°)R3·ZœU{uñˆµ@ºöÈE4è‘!è:•ñMÉU~™ù­ê»Tò¯Ä´£ğŞ—a*.XpOøg$ó°Ò²È¡ÃN- qfebê¼O±ÆÉèö,}K€7^¸¦â,Ë²ÆÓ+¥#c0XÉjnÒ*WÌÔM.{¹RjÒåº„L ë8ï^@+M<“œ3Âvdœå%e±²hï’ì­é=sI4ù|RÆn6¤«¸ˆ:¡+`ñàO#¡„ƒ&x~´Šz<¯sË±
+(OùŒ%5s)r‹âZÏ-§ÇOEĞ»ıËÀf+ …ò«ı0¼B Ê†XÔøˆ—“«íÄçN‚ûYã-bÔ™ĞH‡~|bÚ×±Í@É/¥’çu!Ãr52XFÓJÔ@dèc1Bõ®ìÑÃb`,Ï`º“ò›Ÿşõ+Åô‘şömPâ1âé<¥|æìÒ“7ëÅµc@†å0…Y.Äz§â‘ ¯Œ6tUµZÕAcøî•èDğbXÆ…^PÓ'g†?—K`«n˜Sÿ|ãrf–îj"X&†?v†Û¤„9KêæÁg;…ázÛäš0˜Œa¥S\ÚÆ’œÌD ÇÆwL7¹Ñk´ï¯¶É?T=–Ø	º­¬÷œÑ±áñ†9]¼Ú§Şs	ázáZÛø_,Rbªğ×éÌµæh€æ$›ğñ¢n#nç±¹jµ£•­z£â‚6¤~(h tUœÓ²Öı|‘MobzŞ-¸áÔIg)FO
+ñQ?½İã‹p,Ö%V¨¸4}Ç£¼fœ´8¿ĞJÅ2LE’ê5•Ÿ«»˜=ºÌpn“¯i5‘—2X*°ÂÆà{z¹¤ø¹W‚z3\×qËo§ËNPpäÙ5V÷öÀÁZÓè´`İÒMÓ¢3…¿¹ƒ^•”QLJ§ãHTìM;ø|S£:á9˜ZïSô6êï0vq“SvCS„:‰²rù¤©J4aù¦\ˆTdW`Ïµ1*Û6İ•°êÂmYi²eVaLüè“³8èÌ£îÆ®á?´íÁıÙğøè†h¥Ï–‡Æ~–ÇW¥ ¸ıÚïÍĞ`
+`ø±4†’ıllÌÿı\ÆF»nF¦¿ôó04ö0b³0äı÷52¸yÁ«{w'˜±ÑãŒFIÎ›y&2Ÿ&¿`Üª'R‚f,>¥»Ô§}|flZù8Iµ–ışDgw	²µ×9îµÈşí¯ºû­/¾±;HÿB×¡“6ÅÂ†!7¥éºÌ6Ë_E›/¨mª²1ñnÆÍCvªàŞşeˆ1î°,¨Z%?ı+<úö­Jy4sÅÌÒ§ëÊfih¶O?’}
+"á6O‹~ôë0O…:R‰éÖ83m«³S¶eƒcXeà`z÷³-:ÿ÷sÙ¢x‹z…e•?”3±XaÉ%Ì—K½q#n¼°ĞN®µ,—ü_Ã0²¾Ê´&µ‹ˆ§kƒG5wÛäyç¤ÇÈ&Y…ğ§Gãg]ä|Ó­¶VÌ>Ÿ¯ÂFşé&f\x“mö·ë\àß™„…Áqº8Å2]êú¤š•>˜˜ZÆY>çô£ñVê†K¯>¢ÌâáÇ·raA”Ä¯œÈäJK’Ò\´1ŞÊ}»,lJ’X Ê>2†ælRzÜb™ò$ìı€GÑÊ3ALt“‡ÓÍÍ¨ß†±—£î¹"ôü
+¼e*
+q°v¯š]Q¢–V7häi*1)^Š‡’.‹‡Œ¥Gü-Áæ_şÂ‹_P8Ÿs8šô£q5† Ì”üxñf	®©æ/*gf.€BõY3/®Ú¯ÃÆ@zÔ£ğd¼×Ãäµnÿü"W”†ÉEâ©7 •Ïø54ö
+ëi€WØeLŞ,¯‹‘)£W™ J½V®„>BÓäÔËÄôw®yX£5¢¾áÜ,€Ô+Ì )DL½—I¤æ.9˜çNPòç™PNjèN^ŸçªÅ3øçÁŒEŠÅ;»ß¢},ğ¾è †%€@ä,ŒˆsHõ£Ö®òÉ¦=ù±| :2Ãj¯fq§Ôù®JöÌs˜×»d$×ôXwÁ.›Ş¾Å`„²©sjÍ`íÛF°6pPÔ&.h^X##¤aİ{»¿lTyå†*k^?ê'Ø ãÊP.ÖTÜ¬@Dš¬CÁÌÛvf>£ıGÖ q	ãşCÊWtZÁŒ2/şÃ0Z ½[dxûnÄ¢dŒ†-ˆõ+Çz¹ÇL†ë-µŒ¤$¾ŞØÜ"ås:¸}çğChË„e¹>§´¥Ïª…nOÈzFeÄŸ§øKi¨¿Ì…d‰aŒØgyÌ ÖYYî÷¬b–KaAÃğÌr.*—ÌgÓZ€¾~]¢Xêgš:›}f{ uŞ˜U‘œß©Ô››ÍûõÍ`‰Ö•a}XœmŞ¿64`7vx®Ş—`5î\gúåÅN½YûrÌşÿ÷;jkEL>l=Üºÿ°V¯=€'ƒúpĞxØo<ÜÜ¬}È>ÀÜ«ß{P¯mnVîmİ«ŸÑáƒáƒÙ‡æıZãaó!|ê+Í{£ß4z¯ş!ûP»_«m6êõú½‡•­‡÷g¡f”]ø¶:¡Ór™ß·´;¼dª²0I^“õî{ãjçš5[ˆœ/íDFºkx¥Âº=ñ
+ëèLUÄs»B06‡CÃB/Eá$¹â2ë¦'?v¢ëÌW§çš•Ò=¬?S©×kâÈs-§Ì¹jÚô¯ÀeŞqp¡Uß<ùI×;O~48çÌÉˆxî eâ†PËß)‰æª¼ÛUp6øô¿CêÆvºTÌm§Çl§ŞÜßc2u3³ØAçM™,^Ÿº«m.ÊŒPÎµ¼¢c“´RXê&eËÍw‡Ğ7)²Oõtà©QË
+<òBÕŠO‚‡xÔ).UË!ˆ)¾ğ(@Sä<›Q‰Ü!½ ¬™ŒéI9b© ŞÜc«Rõóu¡$/<æ
+%ôh‚¬ï²ó16·g2"ïLË¢AûÀğÏ,ó2'<7Ócc°ÑJBÛhŞLUºKQM]zCfÊL«æğ}DóËU…§?ĞÔTíUi±3«"tY­°]¸^/0ŠdO9´`D=]´‡VÂ´ÊOJâ'áoc™NÍêĞcÜ .³”ïW/7¦æ¥aU¨ëoxç£'awî@¢Ö6_l`ÅÈvÇ*E‰ğ
+İdvgfà8~'T4ÓÂYNÄ2u¹«™2.‘&å•ğFïº¦UÉ:=5mÑcİj·É/–6'Ã:k7©¡èj((x¾·ïµ£µvÒE+®.9/lK={Qùk{«|ÿV±,üêï‹»ËàqÑ¹U·ıx$_gqìJÊ8äRM¬®.Y9q&*‰=DÀ$|ßÀ¬ñ]ª’ò.ƒ8¦tEò—Åeõ ÕÒş‰WEôJœéps`e€™F‘ú’ø˜ßã&—Šb…ıø%brË
+)òxœûªò€Ë‰P'
+;H×2}
+Ë F¥bä9Ã)‹¡°2¡•$%Ù ·ÿ×®²hfL5,écÈÌ}ÇÇcio÷š‚¦³Ïª«óåó€2/ç£6·I»uĞÚc§Ã£Ãã^‡|IN:'İÃƒÎ	iµ{İ—­Ò9 /»/µ‘Pƒ@wcN TöÆ¾ —Ô/ê®5eúé„¦ *wp~ÓŠ°ÜìˆTdÕ¨%¹;/MoÆğFiá"²0Ì}ğMc2uÀ/Âx@g\Ng–‡Õk9¤~u90Ï#1Aî2Àj´x?hâ¾éß¾8.ô
+1*„7å~±ˆ×i$7³Ş`OÉ‰ËˆÓøÔ·Ó³rE:ìıD¥Ü„A³f›zù¥¬“ƒ¾„ú³©YŒQJ§¢uN÷A8~TÀªÅna…g©ˆ NMX6½`wHª|º}Bms‚=AA0Â±2Fhğ¶£…‚}ä2 ÒxX(:%eäÕ‘¿•.‹•eĞ×e–PbÓPtÌÉ·X*¸VBƒÄcG1‹Á5AOè]‚M&Öåc»èwƒ‘ô+¯¦rÃ8ÈGj«m…C†-Ú)ÈóÌ	ü¡`';D2&ía`J‚åOö¼*·—NÁëx0>ü]gâ„ø²5uè½0À&:³±ç'"mÅ5&”ºO‰ËLjµP=jÖLMK8)•XWÖ½¹q]w=©7X`«áÅ('“ê-Õé’Ê|d6vé_ƒiy^ƒqüL(l§ghXvQ6­ œ²çùñ-»’_*ì±ÖPqh&Ö¤ğ]QáŠ/×é•‹cÀn|L~úÒ=Ú&bµLOcn•'ú‡ìwï¿Ş<¹¬ü“ÈhíV,Ø§,ü”'€\~˜‰04=ğ1ïÌa®I|‚ş¥Cœ¾eXúëÌıfÚ¦(ß3p!£U·Dfi˜ĞÿÿƒãÑª^ú*ÿ¤SHéÔ<1Üss`TyewêŸ·ä­¥,´§f¶&Lœ3—?ñ|¾7=yT‡Fæ ÎÄ‚a6JíÀsSTõ’ÛøGJ×Ãtm½l4üÌ•§½-Oa[;D#^€§êá”K"¯ÎEÓR‡´~§ó«yë(J!ÂxtP6%Ãpa#ÉVŸŒŞcIâğ4~.$ZoÆ¶kş‰ÊR†¢®Íİ$j4ÎQ”1T °¦3õYùJY¸ØKÃÙ ,±áŠJÌÏÕĞÁ+«Ô¨†;äùgå6qR¼—nÈCDåÈø;÷ä@%&1½"‘SĞÑs¡¶‚8ˆØ!|6ã¨›|Ã6ùñ8‹=Oå°“Ô#¿MT&ƒ…‘ŒÆ6yaÚcê‡¨òı%C÷?…FvéªÀ‚m³†2¢°ÊBĞŠ L¦G¿céˆ|´òÑ¨üÃ„G^†$°—õÀw¬?,èQÔÀÛ©ˆ§¡öúÛÄj*:#Í^L<
+“½œä0biÕYR&§»"É&L3S‰1dqß9®Éâ èİÁ÷†»éß¾£…+¨ğĞs®Ñbh×‰7bÙîw‰Ù^n{†§¸Z¦%7ÉLï\fíT=P‡l®9à!Ó¡Säk»Ä²SŒ=•=âë7ñ%9­w®Y÷5îEB&TªA^\@z¼üÌ)Kp–«ìéŒí=I»¶¨ş ùßêáa	_M³‰Pˆâ ö![Ómu[jµ‡ì=HÇ×²½ÙbT-ÃÕjúØ±•Ëkœ_€~ôäç5J$vBEƒkuIGùA†â˜„dİ,B)DaŞ)Óˆº8ü„Bìc­áÄä5Oø²7ÖnĞ'Æ!ÂJáXá,¡Æ¨šŒ91NgMY>·›¬şQ $„)6#”Û\Û±‘™I¤Ù²$Zåş–—G‹;ã¾ ìÈI£a`ÔÀeİ4!®Õ•ƒ¥…a×N˜*ÖOŒ'aş@ÔÆÂyú9_Št§ TŸL(_(,é3É1¸fôXˆÁèuXê¡›Æé‘ÈšÃ0\Ã›Îr	$†3E·NÌo)ØWKÙ¢´Á¿«W¥ÇB[ò¾3ø~]§-PL?F’ğ±1—WÃ'á Ë§«úùÂl{£…Ò'Å½¯aB‰’lãTt_ÒF‚ãŞß™Eî½€ÌbsÄ{ÑzîØç¦&fş/ò0íüÛ"Yû‹9±7[àhw{·?¶[¤{Ğë´‡Ó>ÜïôZÇİC}ê!©Ñûcú€n¢ÈGßÊfŠ²-•ój»·ïÀÅÂ^ä7V°Œ”ó=ï>¸ÃØâ©\Lø”"VDÅƒªézWnxÈ½r>"ù;Xó´o›Uëšºæ9RÄç˜X”sÂ×ö¤Â˜Ò‘ãİ%?À6î‘‘áŒÜÛ·ga…/|bpS)´qÆÊ<vú`*_Ÿšç«0âÀ£]ËºÂ“UÒ>ùy*ˆ*ğxFû–ñTÙÉj,#ˆùˆH$ú1Ol)U¶ş
+'êCCãÁ^åtà`YX‚.}Ã`¯°£˜•r'Sú‚Eá¬ä°xÌ¹ˆWõç‹WÍ½è§¢Lx¡?‹Q 
++÷á.§õW¬ŞéÔuàí'µ””ÿ+‚œ;É‰ÎÙU‹0ZÁ—ë¬®iT’g›ŒšĞ¾çX3&J8°®9û|€Ãó6é-ëômSŞıØÕ­f“d—w”k»… hWÕŒ¼´,ØøJ¿£+›hÄ`2vE0ŠªGÊ5aÃ¨¤Çğ ¥RäLLêù‡	´i‡4"qs“4äøA~%Ü%À/Òq€oP+aq±KáÃŒ¨ôñßşô–åØQ ¸ësàuØú—9ïˆXÈzó8£œ9N‹ŞHÂğbv€p¥Ñ¿åOgó·”¼û8Sª¢7¹ö“DÔÇÏ
+*7XˆöI°İäÙXMÕæ²ÈÑ`¶'ÄzúYøZÏ9ø:çx>ŒZ3ôFÒ<3WIƒU)Ácœb-nú`\8Z»x^È¦ô›¢ MReñĞTx(,¦ÇÉËl`e1»‹Î°€‹Æ–:²%Åµb§¸%/¶%ß?O„Ëu.¼ëMMºˆOŠ+&Ñ¡âç…á°Ü`Ø¤')ˆkC2“Å<˜/Äñö
+‰,ŠÁšÃÒ ëÁ‚ê:•pñØ»¥ï\*Y+ğ7Æ0Äw$Œ‹Šc¼•H(Åã”b™„ oJÈY¢"9“´ àÌD/İH ŠWk¨±?±`Éš	"ĞqäY¤«ıSí´ûˆGduÄy¶í@eÛ(Ãé×¢M.
+§5HLEäÌh~¯$„8&Ç÷ºxJïÃ¬ü]M	ÉŸ˜`û˜ŠsÇZ)Î/íMÏoâ¶Ø?ƒ»Ã‹` İü›ÿ  ÿÿ ¢ï²ã
