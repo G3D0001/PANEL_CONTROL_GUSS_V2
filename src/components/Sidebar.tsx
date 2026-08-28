@@ -39,6 +39,11 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
+  const handleClose = () => {
+    if (typeof onClose === 'function') {
+      onClose();
+    }
+  };
 
   // Comprobar si la ruta actual pertenece a cada grupo
   const isG3dActive = useMemo(() => {
@@ -166,7 +171,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       <div className="p-4 flex flex-col gap-4 h-full relative">
         {/* Close button for mobile */}
         <button 
-          onClick={onClose}
+          onClick={handleClose}
           className="lg:hidden absolute top-4 right-6 size-10 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 shadow-md border border-slate-100"
         >
           <XCircle size={20} />
@@ -217,7 +222,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             >
               <NavLink
                 to="/"
-                onClick={onClose}
+                onClick={handleClose}
                 className="flex-1 flex items-center gap-3 px-4 py-2 cursor-pointer"
               >
                 <Home 
@@ -235,17 +240,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           {/* 2. SECCIÓN: TIENDA G3D */}
           {canShowG3d && (
             <div className="flex flex-col">
-              <button
-                type="button"
-                onClick={() => setIsG3dExpanded(!isG3dExpanded)}
+              <div
                 className={cn(
-                  "w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-150 group relative overflow-hidden text-left cursor-pointer select-none",
+                  "w-full flex items-center justify-between px-3 py-1.5 rounded-xl transition-all duration-150 group relative overflow-hidden text-left select-none",
                   isG3dActive
                     ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold shadow-xs border border-orange-500/20" 
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
                 )}
               >
-                <div className="flex items-center gap-3">
+                {/* Al tocar el texto/icono: navega a Inicio G3D y despliega el acordeón */}
+                <NavLink
+                  to="/?menu=g3d"
+                  onClick={() => {
+                    setIsG3dExpanded(true);
+                    handleClose();
+                  }}
+                  className="flex-1 flex items-center gap-3 py-1 cursor-pointer"
+                >
                   <Package 
                     size={18} 
                     className={cn(
@@ -254,18 +265,28 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     )} 
                   />
                   <span className="text-[13px] font-bold tracking-tight">Tienda G3D</span>
-                </div>
+                </NavLink>
                 
-                <div className="p-1 rounded-lg transition-colors">
+                {/* Al tocar la flechita: solo abre o cierra el desplegable sin navegar */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setIsG3dExpanded(!isG3dExpanded);
+                  }}
+                  className="p-1.5 hover:bg-orange-500/20 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                  title={isG3dExpanded ? "Plegar menú" : "Desplegar menú"}
+                >
                   <ChevronDown 
                     size={15} 
                     className={cn(
-                      "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform duration-300 ease-out",
+                      "transition-transform duration-300 ease-out",
                       isG3dExpanded ? "rotate-180 text-orange-500" : ""
                     )}
                   />
-                </div>
-              </button>
+                </button>
+              </div>
 
               {isG3dExpanded && (
                 <div className="relative pl-7 pr-1 py-1 flex flex-col gap-1">
@@ -276,7 +297,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       <NavLink
                         key={item.to}
                         to={item.to}
-                        onClick={onClose}
+                        onClick={handleClose}
                         className={cn(
                           "flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-[12px] font-bold relative overflow-hidden",
                           isActive
@@ -297,17 +318,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           {/* 3. SECCIÓN: IPTV XTV */}
           {canShowXtv && (
             <div className="flex flex-col">
-              <button
-                type="button"
-                onClick={() => setIsXtvExpanded(!isXtvExpanded)}
+              <div
                 className={cn(
-                  "w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-150 group relative overflow-hidden text-left cursor-pointer select-none",
+                  "w-full flex items-center justify-between px-3 py-1.5 rounded-xl transition-all duration-150 group relative overflow-hidden text-left select-none",
                   isXtvActive
                     ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold shadow-xs border border-blue-500/20" 
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
                 )}
               >
-                <div className="flex items-center gap-3">
+                {/* Al tocar el texto/icono: navega a Inicio XTV y despliega el acordeón */}
+                <NavLink
+                  to="/xtv"
+                  onClick={() => {
+                    setIsXtvExpanded(true);
+                    handleClose();
+                  }}
+                  className="flex-1 flex items-center gap-3 py-1 cursor-pointer"
+                >
                   <Tv 
                     size={18} 
                     className={cn(
@@ -316,18 +343,28 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     )} 
                   />
                   <span className="text-[13px] font-bold tracking-tight">IPTV XTV</span>
-                </div>
+                </NavLink>
                 
-                <div className="p-1 rounded-lg transition-colors">
+                {/* Al tocar la flechita: solo abre o cierra el desplegable sin navegar */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setIsXtvExpanded(!isXtvExpanded);
+                  }}
+                  className="p-1.5 hover:bg-blue-500/20 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                  title={isXtvExpanded ? "Plegar menú" : "Desplegar menú"}
+                >
                   <ChevronDown 
                     size={15} 
                     className={cn(
-                      "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform duration-300 ease-out",
+                      "transition-transform duration-300 ease-out",
                       isXtvExpanded ? "rotate-180 text-blue-500" : ""
                     )}
                   />
-                </div>
-              </button>
+                </button>
+              </div>
 
               {isXtvExpanded && (
                 <div className="relative pl-7 pr-1 py-1 flex flex-col gap-1">
@@ -338,7 +375,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       <NavLink
                         key={item.to}
                         to={item.to}
-                        onClick={onClose}
+                        onClick={handleClose}
                         className={cn(
                           "flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-[12px] font-bold relative overflow-hidden",
                           isActive
@@ -359,17 +396,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           {/* 4. SECCIÓN: APLICACIONES & HERRAMIENTAS */}
           {canShowApps && (
             <div className="flex flex-col">
-              <button
-                type="button"
-                onClick={() => setIsAppsExpanded(!isAppsExpanded)}
+              <div
                 className={cn(
-                  "w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-150 group relative overflow-hidden text-left cursor-pointer select-none",
+                  "w-full flex items-center justify-between px-3 py-1.5 rounded-xl transition-all duration-150 group relative overflow-hidden text-left select-none",
                   isAppsActive
                     ? "bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold shadow-xs border border-teal-500/20" 
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
                 )}
               >
-                <div className="flex items-center gap-3">
+                {/* Al tocar el texto/icono: navega a Apps y despliega el acordeón */}
+                <NavLink
+                  to="/apps"
+                  onClick={() => {
+                    setIsAppsExpanded(true);
+                    handleClose();
+                  }}
+                  className="flex-1 flex items-center gap-3 py-1 cursor-pointer"
+                >
                   <LayoutGrid 
                     size={18} 
                     className={cn(
@@ -378,18 +421,28 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     )} 
                   />
                   <span className="text-[13px] font-bold tracking-tight">Aplicaciones</span>
-                </div>
+                </NavLink>
 
-                <div className="p-1 rounded-lg transition-colors">
+                {/* Al tocar la flechita: solo abre o cierra el desplegable sin navegar */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setIsAppsExpanded(!isAppsExpanded);
+                  }}
+                  className="p-1.5 hover:bg-teal-500/20 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                  title={isAppsExpanded ? "Plegar menú" : "Desplegar menú"}
+                >
                   <ChevronDown 
                     size={15} 
                     className={cn(
-                      "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform duration-300 ease-out",
+                      "transition-transform duration-300 ease-out",
                       isAppsExpanded ? "rotate-180 text-teal-500" : ""
                     )}
                   />
-                </div>
-              </button>
+                </button>
+              </div>
 
               {isAppsExpanded && (
                 <div className="relative pl-7 pr-1 py-1 flex flex-col gap-1">
@@ -398,7 +451,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   {hasPermission('Admin.VistaGeneral.Ver') && (
                     <NavLink
                       to="/apps"
-                      onClick={onClose}
+                      onClick={handleClose}
                       className={cn(
                         "flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-[12px] font-bold relative overflow-hidden",
                         location.pathname === '/apps'
@@ -414,7 +467,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   {hasPermission(PERMISSIONS.STOCK.ACCEDER_CATALOGO.id) && (
                     <NavLink
                       to="/simulador"
-                      onClick={onClose}
+                      onClick={handleClose}
                       className={cn(
                         "flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-[12px] font-bold relative overflow-hidden",
                         location.pathname === '/simulador'
@@ -434,17 +487,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           {/* 5. SECCIÓN: SISTEMA & AUDITORÍA */}
           {canShowSystem && (
             <div className="flex flex-col">
-              <button
-                type="button"
-                onClick={() => setIsSystemExpanded(!isSystemExpanded)}
+              <div
                 className={cn(
-                  "w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-150 group relative overflow-hidden text-left cursor-pointer select-none",
+                  "w-full flex items-center justify-between px-3 py-1.5 rounded-xl transition-all duration-150 group relative overflow-hidden text-left select-none",
                   isSystemActive
                     ? "bg-slate-200/60 dark:bg-slate-800 text-slate-900 dark:text-white font-bold shadow-xs border border-slate-300 dark:border-slate-700" 
                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5"
                 )}
               >
-                <div className="flex items-center gap-3">
+                {/* Al tocar el texto/icono: navega al módulo de reportes/sistema y despliega el acordeón */}
+                <NavLink
+                  to="/reportes"
+                  onClick={() => {
+                    setIsSystemExpanded(true);
+                    handleClose();
+                  }}
+                  className="flex-1 flex items-center gap-3 py-1 cursor-pointer"
+                >
                   <Bug 
                     size={18} 
                     className={cn(
@@ -453,18 +512,28 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     )} 
                   />
                   <span className="text-[13px] font-bold tracking-tight">Sistema</span>
-                </div>
+                </NavLink>
 
-                <div className="p-1 rounded-lg transition-colors">
+                {/* Al tocar la flechita: solo abre o cierra el desplegable sin navegar */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setIsSystemExpanded(!isSystemExpanded);
+                  }}
+                  className="p-1.5 hover:bg-slate-300/40 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                  title={isSystemExpanded ? "Plegar menú" : "Desplegar menú"}
+                >
                   <ChevronDown 
                     size={15} 
                     className={cn(
-                      "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-transform duration-300 ease-out",
+                      "transition-transform duration-300 ease-out",
                       isSystemExpanded ? "rotate-180 text-primary" : ""
                     )}
                   />
-                </div>
-              </button>
+                </button>
+              </div>
 
               {isSystemExpanded && (
                 <div className="relative pl-7 pr-1 py-1 flex flex-col gap-1">
@@ -475,7 +544,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       <NavLink
                         key={item.to}
                         to={item.to}
-                        onClick={onClose}
+                        onClick={handleClose}
                         className={cn(
                           "flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 text-[12px] font-bold relative overflow-hidden",
                           isActive
@@ -545,7 +614,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <NavLink 
                 to="/configuracion" 
                 title="Configuración"
-                onClick={onClose}
+                onClick={handleClose}
                 className={({ isActive }) => cn(
                   "p-1.5 rounded-lg transition-all duration-200 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-800 dark:hover:text-white",
                   isActive ? "bg-white dark:bg-slate-800 text-primary shadow-sm" : ""

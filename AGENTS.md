@@ -55,6 +55,9 @@ Eres un Arquitecto de Software y Desarrollador Full Stack experto. Mi objetivo e
 - **Storage:** Usamos el Storage Bucket `public_assets` en Supabase para logos y fotos.
 
 **Autorreflejo Reciente:**
+- **Separación de Clic en Texto (Navegación + Despliegue) y Flecha (Solo Despliegue) en Menú Lateral (`Sidebar.tsx`)**:
+  1) **Clic en Texto e Ícono**: Al hacer clic en el nombre de la sección (ej: "Tienda G3D", "IPTV XTV", "Aplicaciones", "Sistema"), la aplicación navega directamente a la vista de inicio del módulo correspondiente y despliega automáticamente el acordeón.
+  2) **Clic en la Flecha (Chevron)**: Al tocar el botón con la flechita a la derecha, únicamente se abre o cierra la lista desplegable sin cambiar de página ni recargar la vista actual.
 - **Comportamiento por Defecto y Clic Completo en Desplegables del Menú Lateral (`Sidebar.tsx`)**:
   1) **Cierre por Defecto y Apertura Contextual**: Todos los menús desplegables (Tienda G3D, IPTV XTV, Aplicaciones, Sistema) permanecen cerrados por defecto al iniciar o actualizar la página (`F5`), abriéndose de forma automática y exclusiva únicamente si el usuario se encuentra navegando dentro de una sub-ruta perteneciente a dicho módulo.
   2) **Área de Clic Integral en Cabeceras**: Se amplió la superficie táctil e interactiva a todo el ancho del botón (icono, texto y flecha indicadora), permitiendo abrir y cerrar cómodamente las secciones tocando cualquier parte de la fila y no solo la flecha derecha.
