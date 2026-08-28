@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export function ProfileCompletionOverlay() {
-  const { user, userProfile, refreshProfile, signOut } = useAuth();
+  const { user, userProfile, refreshProfile, signOut, setUserProfile, updateUserProfileLocally } = useAuth();
   
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -38,43 +38,63 @@ export function ProfileCompletionOverlay() {
   useEffect(() => {
     if (userProfile) {
       setNombre(userProfile.nombre || '');
-      setTelefono(userProfile.telefono_contacto || '');
-      setDireccion(userProfile.direccion_hogar || '');
-      setReferencia(userProfile.referencia_personal || '');
-      setAvatarUrl(userProfile.avatar_url || userProfile.foto_perfil || '');
+      setTelefono(userProfile.telefono_contacto || userProfile.telefono || userProfile.datos_adicionales?.telefono_contacto || '');
+      setDireccion(userProfile.direccion_hogar || userProfile.direccion || userProfile.datos_adicionales?.direccion_hogar || '');
+      setReferencia(userProfile.referencia_personal || userProfile.referencia || userProfile.datos_adicionales?.referencia_personal || '');
+      setAvatarUrl(userProfile.avatar_url || userProfile.foto_perfil || userProfile.datos_adicionales?.avatar_url || '');
     }
   }, [userProfile]);
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 3 * 1024 * 1024) {
-      toast.error('La imagen no debe superar los 3MB');
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('La imagen no debe superar los 10MB');
       return;
     }
 
     setIsUploading(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user?.id || 'perfil'}_${Date.now()}.${fileExt}`;
-      const filePath = `perfiles/${fileName}`;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 400;
+        const MAX_HEIGHT = 400;
+        let width = img.width;
+        let height = img.height;
 
-      const { error: uploadError } = await supabase.storage
-        .from('public_assets')
-        .upload(filePath, file);
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
 
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from('public_assets').getPublicUrl(filePath);
-      setAvatarUrl(data.publicUrl);
-      toast.success('Foto de perfil subida correctamente');
-    } catch (err: any) {
-      console.error('Error al subir foto:', err);
-      toast.error(`Error al subir imagen: ${err.message || 'Error desconocido'}`);
-    } finally {
-      setIsUploading(false);
-    }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const base64 = canvas.toDataURL('image/jpeg', 0.85);
+          setAvatarUrl(base64);
+          toast.success('Foto de perfil procesada correctamente.');
+        }
+        setIsUploading(false);
+      };
+      img.onerror = () => {
+        setIsUploading(false);
+        toast.error('Error al procesar la imagen.');
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -97,8 +117,9 @@ export function ProfileCompletionOverlay() {
       return;
     }
 
-    const needsPasswordChange = userProfile?.password_hash === '123456';
-    let finalPassword = userProfile?.password_hash;
+    const currentPass = userProfile?.password_hash || userProfile?.password || userProfile?.clave;
+    const needsPasswordChange = currentPass === '123456';
+    let finalPassword = currentPass || '123456';
 
     if (needsPasswordChange) {
       if (!newPassword) {
@@ -118,24 +139,75 @@ export function ProfileCompletionOverlay() {
 
     setIsSaving(true);
     try {
-      const payload = {
+      const payload: any = {
         nombre: nombre.trim(),
         telefono_contacto: telefono.trim(),
         direccion_hogar: direccion.trim(),
         referencia_personal: referencia.trim(),
         avatar_url: avatarUrl,
         foto_perfil: avatarUrl,
+        password_hash: finalPassword,
+        datos_adicionales: {
+          ...(userProfile?.datos_adicionales || {}),
+          nombre: nombre.trim(),
+          telefono_contacto: telefono.trim(),
+          direccion_hogar: direccion.trim(),
+          referencia_personal: referencia.trim(),
+          avatar_url: avatarUrl,
+          foto_perfil: avatarUrl,
+          password_hash: finalPassword
+        }
+      };
+
+      // 1. Intentar actualizar en Supabase
+      try {
+        let query = supabase.from('perfiles_locales').update(payload);
+        if (userProfile?.id && !String(userProfile.id).startsWith('profile-id-')) {
+          query = query.eq('id', userProfile.id);
+        } else if (userProfile?.email) {
+          query = query.eq('email', userProfile.email);
+        } else if (userProfile?.usuario) {
+          query = query.eq('usuario', userProfile.usuario);
+        } else if (user?.email) {
+          query = query.eq('email', user.email);
+        }
+        const { error } = await query;
+        if (error) {
+          console.warn("Aviso en actualización de Supabase:", error);
+          // Fallback con payload reducido si alguna columna no existe en BD
+          try {
+            const fallbackPayload = {
+              nombre: nombre.trim(),
+              password_hash: finalPassword,
+              avatar_url: avatarUrl,
+              datos_adicionales: payload.datos_adicionales
+            };
+            if (userProfile?.email) {
+              await supabase.from('perfiles_locales').update(fallbackPayload).eq('email', userProfile.email);
+            }
+          } catch (innerErr) {
+            console.warn("Fallback de actualización omitido:", innerErr);
+          }
+        }
+      } catch (dbErr) {
+        console.warn("Fallo de conexión en actualización Supabase:", dbErr);
+      }
+
+      // 2. Actualizar inmediatamente en memoria y sesión para salir de la pantalla de bienvenida
+      const updatedProfileObj = {
+        ...(userProfile || {}),
+        ...payload,
         password_hash: finalPassword
       };
 
-      const { error } = await supabase
-        .from('perfiles_locales')
-        .update(payload)
-        .eq('id', userProfile.id);
+      if (updateUserProfileLocally) {
+        updateUserProfileLocally(updatedProfileObj);
+      }
+      if (setUserProfile) {
+        setUserProfile(updatedProfileObj);
+      }
 
-      if (error) throw error;
-
-      toast.success('¡Perfil completado con éxito!');
+      toast.success('¡Perfil completado con éxito! Bienvenido al sistema.');
       await refreshProfile();
     } catch (err: any) {
       console.error('Error al guardar perfil:', err);

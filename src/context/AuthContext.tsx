@@ -23,6 +23,8 @@ interface AuthContextType {
   setSimulatedPermissions: (perms: string[]) => void;
   persistPermissions: () => Promise<{ success: boolean; error?: string }>;
   loginLocal: (usuario: string, contrasena: string) => Promise<{ success: boolean; error?: string }>;
+  setUserProfile: React.Dispatch<React.SetStateAction<any>>;
+  updateUserProfileLocally: (newProfile: any) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -462,6 +464,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!skipSetSession) {
         localStorage.setItem('g3d_panel_usuario_sesion', JSON.stringify(customSession));
         setPanelSession(customSession);
+        setUserProfile(matchedUser);
         toast.success(`¡Bienvenido ${customSession.nombre}!`);
       }
 
@@ -474,6 +477,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
     }
   }, []);
+
+  const updateUserProfileLocally = useCallback((newProfileData: any) => {
+    setUserProfile((prev: any) => {
+      const merged = { ...(prev || {}), ...newProfileData };
+      return merged;
+    });
+
+    if (panelSession) {
+      const updatedSession = {
+        ...panelSession,
+        nombre: newProfileData.nombre || panelSession.nombre,
+        rol: newProfileData.rol || panelSession.rol,
+        avatar_url: newProfileData.avatar_url || newProfileData.foto_perfil || panelSession.avatar_url || ''
+      };
+      localStorage.setItem('g3d_panel_usuario_sesion', JSON.stringify(updatedSession));
+      setPanelSession(updatedSession);
+    }
+  }, [panelSession]);
 
   const signOut = useCallback(async () => {
     localStorage.removeItem('g3d_panel_usuario_sesion');
@@ -715,11 +736,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSimulatedRole,
     setSimulatedPermissions,
     persistPermissions,
-    loginLocal
+    loginLocal,
+    setUserProfile,
+    updateUserProfileLocally
   }), [
     session, user, userProfile, loading, signOut, refreshProfile, signInLocal,
     userRole, userRoles, userPermissions, simulatedRole, simulatedPermissions,
-    hasPermission, persistPermissions, loginLocal
+    hasPermission, persistPermissions, loginLocal, updateUserProfileLocally
   ]);
 
   return (

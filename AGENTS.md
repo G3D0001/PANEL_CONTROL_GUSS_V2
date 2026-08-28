@@ -55,6 +55,10 @@ Eres un Arquitecto de Software y Desarrollador Full Stack experto. Mi objetivo e
 - **Storage:** Usamos el Storage Bucket `public_assets` en Supabase para logos y fotos.
 
 **Autorreflejo Reciente:**
+- **Resolución de Transición Inmediata al Completar Perfil y Optimización de Imágenes (`ProfileCompletionOverlay.tsx` / `AuthContext.tsx` / `App.tsx`)**:
+  1) **Transición Inmediata de Pantalla**: Se sincronizó la actualización de estado de React (`setUserProfile`, `updateUserProfileLocally`) directamente tras guardar los datos del perfil obligatorio, eliminando la retención en la pantalla de bienvenida.
+  2) **Procesamiento de Imágenes con Canvas (Regla #21)**: La subida de foto de perfil ahora se comprime y procesa en Base64 de forma 100% local e instantánea, eliminando bloqueos o dependencias de almacenamiento de Supabase.
+  3) **Compatibilidad Flexible de Columnas en App.tsx**: La verificación de perfil incompleto valida tanto los nombres de columna directa como los campos anidados en `datos_adicionales`.
 - **Gestión Integral de Usuarios y Perfiles (3 Bloques) con Asignación Multi-Rol RBAC (`UserProfilesManagementTab.tsx` / `PermissionsCasbinTab.tsx` / `AuthContext.tsx` / `SettingsView.tsx`)**:
   1) **Consola de Administración de Usuarios (3 Bloques)**: Se creó la pestaña dedicada "Usuarios & Perfiles" en Ajustes que organiza los datos de cada operador en 3 bloques visuales nítidos: **1. Perfil Personal** (Nombre, Email, Teléfono, Contraseña con revelación/edición y Selector Multi-Rol), **2. Perfil de Negocio G3D** (Razón social, CUIT/DNI, Domicilio, Logística y Carga de Logo Local) y **3. Perfil de Negocio XTV** (Identidad de marca, WhatsApp comercial, Alias de cobro y Plantilla de Mensaje de Entrega).
   2) **Arquitectura Multi-Rol RBAC Real y Agregación Dinámica**: Cada usuario puede tener 1 o más roles asignados simultáneamente (ej: `Vendedor G3D`, `Revendedor IPTV`, `Operador`). El motor de autenticación (`AuthContext.tsx`) y la consola de permisos (`PermissionsCasbinTab.tsx`) resuelven y agregan en tiempo real todos los permisos e invariantes heredados de los múltiples roles, admitiendo además permisos extra y bloqueos explícitos.

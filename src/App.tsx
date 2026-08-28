@@ -217,10 +217,10 @@ function AppContent() {
 
   const isProfileIncomplete = user && userProfile ? (
     !userProfile.nombre || userProfile.nombre.trim() === '' ||
-    !userProfile.telefono_contacto || userProfile.telefono_contacto.trim() === '' ||
-    !userProfile.direccion_hogar || userProfile.direccion_hogar.trim() === '' ||
-    !(userProfile.foto_perfil || userProfile.avatar_url) ||
-    userProfile.password_hash === '123456'
+    !(userProfile.telefono_contacto || userProfile.telefono || userProfile.datos_adicionales?.telefono_contacto) ||
+    !(userProfile.direccion_hogar || userProfile.direccion || userProfile.datos_adicionales?.direccion_hogar) ||
+    !(userProfile.foto_perfil || userProfile.avatar_url || userProfile.datos_adicionales?.avatar_url) ||
+    (userProfile.password_hash === '123456' || userProfile.password === '123456' || userProfile.clave === '123456')
   ) : false;
 
   if (isProfileIncomplete) {
