@@ -323,48 +323,149 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [panelSession]);
 
   const loginLocal = useCallback(async (usuarioInput: string, contrasenaInput: string, skipSetSession = false): Promise<{ success: boolean; error?: string; sessionData?: any }> => {
-    const userLower = usuarioInput.trim().toLowerCase();
+    const rawInput = usuarioInput.trim();
+    const userLower = rawInput.toLowerCase();
     const pass = contrasenaInput.trim();
 
+    if (!rawInput || !pass) {
+      return { success: false, error: 'Por favor, ingresa tu usuario y contraseña.' };
+    }
+
     try {
-      // Intentar encontrar con email directo o con el sufijo @xtv.com aplicable
-      let possibleEmails = [userLower];
-      if (!userLower.includes('@')) {
-        possibleEmails.push(`${userLower}@xtv.com`);
+      let foundUsers: any[] = [];
+
+      // 1. Intentar búsqueda combinada inteligente en Supabase (email exacto, email con prefijo, usuario o nombre)
+      try {
+        const orFilter = userLower.includes('@')
+          ? `email.ilike.${userLower}`
+          : `email.ilike.${userLower},email.ilike.${userLower}@%,usuario.ilike.${userLower},nombre.ilike.${userLower}`;
+
+        const { data: orData, error: orError } = await supabase
+          .from('perfiles_locales')
+          .select('*')
+          .or(orFilter);
+
+        if (!orError && Array.isArray(orData) && orData.length > 0) {
+          foundUsers = orData;
+        }
+      } catch (errOr) {
+        console.warn("[loginLocal] Búsqueda por filtro OR no disponible, usando búsqueda por lista:", errOr);
       }
 
-      // 1. Intentamos consultar la tabla única central "perfiles_locales"
-      const { data, error } = await supabase
-        .from('perfiles_locales')
-        .select('*')
-        .in('email', possibleEmails)
-        .eq('password_hash', pass)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        // Verificar si el usuario está bloqueado o inactivo
-        if (data.activo === false || data.bloqueado === true || data.estado === 'bloqueado') {
-          return {
-            success: false,
-            error: '⛔ Acceso denegado: Este usuario ha sido bloqueado o desactivado por el Administrador.'
-          };
+      // 2. Fallback si el filtro OR no devolvió resultados: Búsqueda directa por posibles emails
+      if (foundUsers.length === 0) {
+        const possibleEmails = [userLower];
+        if (!userLower.includes('@')) {
+          possibleEmails.push(`${userLower}@xtv.com`);
+          possibleEmails.push(`${userLower}@g3d.com`);
+          possibleEmails.push(`${userLower}@gmail.com`);
         }
 
-        const customSession = {
-          id: data.id || `profile-id-${data.email}`,
-          usuario: data.email,
-          nombre: data.nombre || data.email.split('@')[0],
-          rol: data.rol || 'IPTV CLIENTES'
+        const { data: emailData } = await supabase
+          .from('perfiles_locales')
+          .select('*')
+          .in('email', possibleEmails);
+
+        if (Array.isArray(emailData) && emailData.length > 0) {
+          foundUsers = emailData;
+        }
+      }
+
+      // 3. Fallback adicional: Búsqueda flexible por nombre que contenga el término
+      if (foundUsers.length === 0) {
+        const { data: nameData } = await supabase
+          .from('perfiles_locales')
+          .select('*')
+          .ilike('nombre', `%${userLower}%`);
+
+        if (Array.isArray(nameData) && nameData.length > 0) {
+          foundUsers = nameData;
+        }
+      }
+
+      // 4. Si aún no encontramos el usuario, consultar todos los perfiles si la lista es pequeña (para evitar problemas de formato)
+      if (foundUsers.length === 0) {
+        const { data: allData } = await supabase
+          .from('perfiles_locales')
+          .select('*')
+          .limit(50);
+
+        if (Array.isArray(allData) && allData.length > 0) {
+          const matched = allData.filter((u: any) => {
+            const uEmail = String(u.email || '').toLowerCase();
+            const uNombre = String(u.nombre || '').toLowerCase();
+            const uUser = String(u.usuario || '').toLowerCase();
+            return (
+              uEmail === userLower ||
+              uEmail.startsWith(`${userLower}@`) ||
+              uNombre.includes(userLower) ||
+              uUser === userLower
+            );
+          });
+          if (matched.length > 0) {
+            foundUsers = matched;
+          }
+        }
+      }
+
+      // Si no se encontró ningún usuario con ese identificador
+      if (foundUsers.length === 0) {
+        return {
+          success: false,
+          error: `No se encontró ningún usuario registrado como "${rawInput}". Verifica que esté creado en la tabla "perfiles_locales" de Supabase (por nombre o correo).`
         };
-        if (!skipSetSession) {
-          localStorage.setItem('g3d_panel_usuario_sesion', JSON.stringify(customSession));
-          setPanelSession(customSession);
-          toast.success(`¡Bienvenido ${customSession.nombre}!`);
-        }
-        return { success: true, sessionData: customSession };
       }
+
+      // 5. Validar la contraseña contra las posibles columnas (password_hash, password, clave, contrasena)
+      let matchedUser: any = null;
+      for (const candidate of foundUsers) {
+        const candidatePass = 
+          candidate.password_hash || 
+          candidate.password || 
+          candidate.clave || 
+          candidate.contrasena ||
+          candidate.datos_adicionales?.password ||
+          candidate.datos_adicionales?.password_hash ||
+          candidate.datos_adicionales?.clave;
+
+        if (candidatePass && String(candidatePass).trim() === pass) {
+          matchedUser = candidate;
+          break;
+        }
+      }
+
+      if (!matchedUser) {
+        const matchedCandidate = foundUsers[0];
+        const displayName = matchedCandidate.nombre || matchedCandidate.email || rawInput;
+        return {
+          success: false,
+          error: `Contraseña incorrecta para el usuario "${displayName}". Verifica la clave ingresada.`
+        };
+      }
+
+      // 6. Verificar si el usuario está bloqueado o inactivo
+      if (matchedUser.activo === false || matchedUser.bloqueado === true || matchedUser.estado === 'bloqueado') {
+        return {
+          success: false,
+          error: '⛔ Acceso denegado: Este usuario ha sido bloqueado o desactivado por el Administrador.'
+        };
+      }
+
+      // 7. Generar sesión exitosa
+      const customSession = {
+        id: matchedUser.id || `profile-id-${matchedUser.email}`,
+        usuario: matchedUser.email || matchedUser.usuario || rawInput,
+        nombre: matchedUser.nombre || matchedUser.email?.split('@')[0] || rawInput,
+        rol: matchedUser.rol || 'VENDEDOR'
+      };
+
+      if (!skipSetSession) {
+        localStorage.setItem('g3d_panel_usuario_sesion', JSON.stringify(customSession));
+        setPanelSession(customSession);
+        toast.success(`¡Bienvenido ${customSession.nombre}!`);
+      }
+
+      return { success: true, sessionData: customSession };
     } catch (e: any) {
       console.warn("[loginLocal] Error consultando perfiles_locales:", e);
       return { 
@@ -372,11 +473,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: `Error de conexión con la base de datos de Supabase: ${e.message || e}`
       };
     }
-
-    return {
-      success: false,
-      error: 'Usuario o contraseña incorrectos. Verifica que el usuario exista en la tabla "perfiles_locales" de Supabase con su respectivo correo y contraseña.'
-    };
   }, []);
 
   const signOut = useCallback(async () => {
