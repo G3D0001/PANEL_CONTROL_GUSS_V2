@@ -606,14 +606,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Normalizar permisos para incluir alias de compatibilidad bidireccional (evita fallos por diferencias de tipeo)
     const normalizedPermissions = [...currentPermissions];
     
-    // Si tiene cualquier permiso de IPTV, se le otorga acceso al ingreso del módulo XTV
+    // Si tiene cualquier permiso de XTV / IPTV, se le otorga acceso al ingreso general del módulo XTV
     const hasAnyIptvChild = currentPermissions.some((p: string) => {
       if (p.startsWith('-')) return false;
       const lp = p.toLowerCase();
-      return lp.startsWith('iptv.') || lp === '*';
+      return lp.startsWith('xtv.') || lp.startsWith('iptv.') || lp === '*';
     });
 
     if (hasAnyIptvChild) {
+      if (!normalizedPermissions.some(p => p.toLowerCase() === 'xtv.general.acceder')) {
+        normalizedPermissions.push('Xtv.General.Acceder');
+      }
       if (!normalizedPermissions.some(p => p.toLowerCase() === 'iptv.inicioresendores.ingresar')) {
         normalizedPermissions.push('Iptv.InicioResendores.Ingresar');
       }
@@ -626,6 +629,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!normalizedPermissions.some(p => p.toLowerCase() === 'inicio.xtv.acceder')) {
         normalizedPermissions.push('Inicio.Xtv.Acceder');
       }
+    }
+
+    // Si tiene permiso de G3D (G3d.AccesoCompleto, G3d.*) se le otorga acceso a todas las sub-secciones de la tienda G3D
+    const hasG3dComplete = currentPermissions.some((p: string) => {
+      if (p.startsWith('-')) return false;
+      const lp = p.toLowerCase();
+      return lp === 'g3d.accesocompleto' || lp === 'g3d.*' || lp === '*';
+    });
+
+    if (hasG3dComplete) {
+      const g3dLegacyPerms = [
+        'Stock.*', 'Stock.VistaGeneral.Ver', 'Pedidos.*', 'Pedidos.VistaGeneral.Ver',
+        'Logistica.*', 'Logistica.VistaGeneral.Ver', 'Admin.VistaGeneral.Ver',
+        'Inicio.G3d.Ver', 'Inicio.G3d.Acceder'
+      ];
+      g3dLegacyPerms.forEach(perm => {
+        if (!normalizedPermissions.some(p => p.toLowerCase() === perm.toLowerCase())) {
+          normalizedPermissions.push(perm);
+        }
+      });
     }
 
     // Si tiene cualquier permiso de G3D / Stock / Pedidos / Logística, se le otorga acceso a ver e ingresar a G3D
@@ -694,10 +717,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Mapeo transparente bidireccional entre Xtv.* y Iptv.* / G3d.*
+      const aliasMap: Record<string, string[]> = {
+        'xtv.general.acceder': ['iptv.inicioresendores.ingresar', 'iptv.iniciorevendedores.ingresar', 'inicio.xtv.ver', 'inicio.xtv.acceder', 'iptv.acceso'],
+        'xtv.lineas.creardirecto': ['iptv.creardirecto.ver', 'iptv.creardirecto.acceder'],
+        'xtv.lineas.solicitar': ['iptv.solicitaractivacion.ver', 'iptv.solicitaractivacion.acceder'],
+        'xtv.lineas.demo': ['iptv.creardirecto.demo', 'iptv.demo.ver', 'iptv.demo.acceder'],
+        'xtv.clientes.verpropios': ['iptv.clientes.verpropios', 'iptv.clientes.ver', 'iptv.clientes.acceder'],
+        'xtv.clientes.vertodos': ['iptv.clientes.vertodos', 'iptv.clientes.ver_todos'],
+        'xtv.renovaciones.verpropias': ['iptv.renovaciones.verpropios', 'iptv.renovaciones.ver', 'iptv.renovaciones.acceder'],
+        'xtv.renovaciones.vertodas': ['iptv.renovaciones.vertodos', 'iptv.renovaciones.renovar_general'],
+        'xtv.solicitudes.ver': ['iptv.solicitudes.ver', 'iptv.solicitudes.acceder', 'iptv.solicitudes.vertodas'],
+        'xtv.solicitudes.aprobar': ['iptv.solicitudes.aprobar'],
+        'xtv.finanzas.verpropias': ['iptv.finanzas.ver', 'iptv.finanzas.acceder', 'iptv.finanzas.revendedores.ver', 'inicio.finanzas.ver', 'inicio.finanzas.acceder'],
+        'xtv.finanzas.liquidaradmin': ['iptv.comisiones.solicitudes.interactuar', 'inicio.finanzasadmin.ver', 'inicio.finanzasadmin.acceder'],
+        'xtv.ajustes.planes': ['iptv.planes.ver', 'iptv.planes.editar', 'iptv.ajustes.ver'],
+        'xtv.ajustes.panelxc': ['iptv.panelxc.ver', 'admin.consolaapi.ver', 'admin.integracionxc.acceder', 'iptv.creditos_xc_panel.ver'],
+        'g3d.accesocompleto': ['g3d.*', 'stock.*', 'pedidos.*', 'logistica.*', 'stock.vistageneral.ver', 'pedidos.vistageneral.ver', 'logistica.vistageneral.ver', 'inicio.g3d.ver', 'inicio.g3d.acceder']
+      };
+
+      for (const [canonical, aliases] of Object.entries(aliasMap)) {
+        const fullGroup = [canonical, ...aliases];
+        if (fullGroup.includes(cleanNode) && fullGroup.includes(cleanPerm)) {
+          return true;
+        }
+      }
+
       // Equivalencias de alias para entrada a XTV
       if (
-        (cleanNode === 'iptv.inicioresendores.ingresar' || cleanNode === 'iptv.iniciorevendedores.ingresar' || cleanNode === 'inicio.xtv.ver' || cleanNode === 'inicio.xtv.acceder') &&
-        (cleanPerm === 'iptv.inicioresendores.ingresar' || cleanPerm === 'iptv.iniciorevendedores.ingresar' || cleanPerm === 'inicio.xtv.ver' || cleanPerm === 'inicio.xtv.acceder')
+        (cleanNode === 'iptv.inicioresendores.ingresar' || cleanNode === 'iptv.iniciorevendedores.ingresar' || cleanNode === 'inicio.xtv.ver' || cleanNode === 'inicio.xtv.acceder' || cleanNode === 'xtv.general.acceder') &&
+        (cleanPerm === 'iptv.inicioresendores.ingresar' || cleanPerm === 'iptv.iniciorevendedores.ingresar' || cleanPerm === 'inicio.xtv.ver' || cleanPerm === 'inicio.xtv.acceder' || cleanPerm === 'xtv.general.acceder')
       ) {
         return true;
       }

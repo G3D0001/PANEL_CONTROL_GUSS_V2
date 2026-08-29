@@ -84,39 +84,39 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, userRole, userPermissions, hasPermission, signOut } = useAuth();
   const { businessProfile } = useApp();
 
-  // Módulo G3D - Tienda Web
+  // Módulo G3D - Tienda Web (Unificado con G3d.AccesoCompleto)
   const g3dItems = [
-    { to: "/mis-productos", label: "Catálogo & Stock", icon: Package, permission: PERMISSIONS.STOCK.ACCEDER_CATALOGO.id },
-    { to: "/pedidos", label: "Gestión de Pedidos", icon: ReceiptText, permission: PERMISSIONS.PEDIDOS.ACCEDER_PEDIDOS.id },
-    { to: "/moderacion", label: "Moderación Store", icon: Lock, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
-    { to: "/clasificacion", label: "Categorías y Flujos", icon: LayoutGrid, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
-    { to: "/proveedores", label: "Proveedores", icon: Truck, permission: PERMISSIONS.STOCK.ACCEDER_CATALOGO.id },
-    { to: "/revendedores", label: "Revendedores", icon: Building2, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
-    { to: "/logistica", label: "Logística Central", icon: Navigation, permission: PERMISSIONS.LOGISTICA.ACCEDER_LOGISTICA.id },
-  ].filter(item => hasPermission(item.permission));
+    { to: "/mis-productos", label: "Catálogo & Stock", icon: Package, permission: 'G3d.AccesoCompleto' },
+    { to: "/pedidos", label: "Gestión de Pedidos", icon: ReceiptText, permission: 'G3d.AccesoCompleto' },
+    { to: "/moderacion", label: "Moderación Store", icon: Lock, permission: 'G3d.AccesoCompleto' },
+    { to: "/clasificacion", label: "Categorías y Flujos", icon: LayoutGrid, permission: 'G3d.AccesoCompleto' },
+    { to: "/proveedores", label: "Proveedores", icon: Truck, permission: 'G3d.AccesoCompleto' },
+    { to: "/revendedores", label: "Revendedores", icon: Building2, permission: 'G3d.AccesoCompleto' },
+    { to: "/logistica", label: "Logística Central", icon: Navigation, permission: 'G3d.AccesoCompleto' },
+  ].filter(item => hasPermission(item.permission) || hasPermission('G3d.*') || hasPermission('Admin.*') || userRole === 'Admin' || userRole === 'Administrador');
 
-  // Módulo XTV - TV Digital
+  // Módulo XTV - TV Digital (Nomenclatura limpia Xtv.*)
   const xtvItems = [
-    { to: "/xtv?menu=crear_directo", label: "Crear Línea Directa", icon: Sparkles, permission: 'Iptv.CrearDirecto.Ver' },
-    { to: "/xtv?menu=solicitar_activacion", label: "Solicitar / Demo", icon: Tv, permission: 'Iptv.SolicitarActivacion.Ver' },
-    { to: "/xtv?menu=renovaciones", label: "Renovaciones", icon: Rotate3d, permission: 'Iptv.Renovaciones.Ver' },
-    { to: "/xtv?menu=mis_clientes", label: "Mis Clientes", icon: User, permission: 'Iptv.Clientes.Ver' },
-    { to: "/xtv?menu=finanzas", label: "Solicitudes & Créditos", icon: ReceiptText, permission: 'Iptv.Solicitudes.Ver' },
-  ].filter(item => hasPermission(item.permission) || hasPermission('Iptv.*') || hasPermission('Admin.*'));
+    { to: "/xtv?menu=crear_directo", label: "Crear Línea Directa", icon: Sparkles, permission: 'Xtv.Lineas.CrearDirecto' },
+    { to: "/xtv?menu=solicitar_activacion", label: "Solicitar / Demo", icon: Tv, permission: 'Xtv.Lineas.Solicitar' },
+    { to: "/xtv?menu=renovaciones", label: "Renovaciones", icon: Rotate3d, permission: 'Xtv.Renovaciones.VerPropias' },
+    { to: "/xtv?menu=mis_clientes", label: "Mis Clientes", icon: User, permission: 'Xtv.Clientes.VerPropios' },
+    { to: "/xtv?menu=finanzas", label: "Solicitudes & Créditos", icon: ReceiptText, permission: 'Xtv.Solicitudes.Ver' },
+  ].filter(item => hasPermission(item.permission) || hasPermission('Xtv.*') || hasPermission('Iptv.*') || hasPermission('Admin.*') || userRole === 'Admin' || userRole === 'Administrador');
 
   // Módulo Sistema & Auditoría
   const systemItems = [
-    { to: "/configuracion?tab=users", label: "Usuarios & Perfiles", icon: Users, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
-    { to: "/configuracion?tab=permissions", label: "Permisos RBAC", icon: ShieldCheck, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
-    { to: "/reportes", label: "Centro de Reportes", icon: Bug, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id, badge: true },
-    { to: "/historial", label: "Historial de Auditoría", icon: History, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
-    { to: "/configuracion", label: "Ajustes del Sistema", icon: Settings, permission: PERMISSIONS.ADMIN.ACCEDER_ADMINISTRACION.id },
-  ].filter(item => hasPermission(item.permission) || userRole === 'Admin' || userRole === 'Administrador');
+    { to: "/configuracion?tab=users", label: "Usuarios & Perfiles", icon: Users, permission: 'Admin.Usuarios.Gestionar' },
+    { to: "/configuracion?tab=permissions", label: "Permisos RBAC", icon: ShieldCheck, permission: 'Admin.Permisos.Gestionar' },
+    { to: "/reportes", label: "Centro de Reportes", icon: Bug, permission: 'Admin.Ajustes.Gestionar', badge: true },
+    { to: "/historial", label: "Historial de Auditoría", icon: History, permission: 'Admin.Ajustes.Gestionar' },
+    { to: "/configuracion", label: "Ajustes del Sistema", icon: Settings, permission: 'Admin.Ajustes.Gestionar' },
+  ].filter(item => hasPermission(item.permission) || hasPermission('Admin.*') || userRole === 'Admin' || userRole === 'Administrador');
 
-  const canShowG3d = g3dItems.length > 0;
-  const canShowXtv = xtvItems.length > 0 || hasPermission('Inicio.Xtv.Ver') || hasPermission('Iptv.*');
-  const canShowApps = hasPermission('Admin.VistaGeneral.Ver') || hasPermission(PERMISSIONS.STOCK.ACCEDER_CATALOGO.id);
-  const canShowSystem = systemItems.length > 0;
+  const canShowG3d = g3dItems.length > 0 || hasPermission('G3d.AccesoCompleto') || hasPermission('G3d.*') || userRole === 'Admin';
+  const canShowXtv = xtvItems.length > 0 || hasPermission('Xtv.General.Acceder') || hasPermission('Xtv.*') || hasPermission('Iptv.*');
+  const canShowApps = hasPermission('Admin.*') || hasPermission('G3d.AccesoCompleto') || userRole === 'Admin';
+  const canShowSystem = systemItems.length > 0 || hasPermission('Admin.*') || userRole === 'Admin';
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -468,7 +468,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     </NavLink>
                   )}
 
-                  {hasPermission(PERMISSIONS.STOCK.ACCEDER_CATALOGO.id) && (
+                  {hasPermission(PERMISSIONS.G3D.ACCESO_COMPLETO.id) && (
                     <NavLink
                       to="/simulador"
                       onClick={handleClose}
@@ -571,7 +571,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </nav>
 
         {/* Tienda Web Link */}
-        {hasPermission(PERMISSIONS.STOCK.ACCEDER_CATALOGO.id) && (
+        {hasPermission(PERMISSIONS.G3D.ACCESO_COMPLETO.id) && (
           <div className="pb-4">
             <a 
               href={businessProfile?.tienda_url || '#'} 

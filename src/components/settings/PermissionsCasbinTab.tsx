@@ -59,12 +59,15 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged, initialSelect
 
   // Estado de acordeones desplegables por facción
   const [expandedFactions, setExpandedFactions] = useState<Record<string, boolean>>({
-    ADMIN: true,
-    IPTV: true,
+    XTV_ACCESO: true,
+    XTV_LINEAS: true,
+    XTV_CLIENTES: true,
+    XTV_RENOVACIONES: true,
+    XTV_SOLICITUDES: true,
+    XTV_FINANZAS: true,
+    XTV_AJUSTES: false,
     G3D: true,
-    PEDIDOS: true,
-    FINANZAS_CONSOLIDADAS: false,
-    LOGISTICA: false
+    ADMIN: true
   });
 
   // Customizaciones locales de Título y Descripción de permisos (Regla de Oro #11)
@@ -105,17 +108,15 @@ export function PermissionsCasbinTab({ currentUser, onDataChanged, initialSelect
 
   // Facciones de trabajo normalizadas con iconos, categorías y descripciones claras
   const FACTIONS_CONFIG: Record<string, { label: string; icon: string; subtitle: string; scope: 'XTV' | 'G3D' | 'ADMIN' }> = {
-    IPTV: { label: 'XTV - SERVICIO DE TV DIGITAL', icon: '📺', subtitle: 'Líneas físicas XC, cuentas demo, MAG, M3U y revendedores XTV', scope: 'XTV' },
-    G3D: { label: 'G3D - TIENDA WEB & CATALOGO', icon: '🛍️', subtitle: 'Catálogo de productos, variantes, stock y moderación store', scope: 'G3D' },
-    PEDIDOS: { label: 'G3D - PEDIDOS & DESPACHOS', icon: '📦', subtitle: 'Gestión de compras, órdenes de clientes y cotizaciones de tienda', scope: 'G3D' },
-    LOGISTICA: { label: 'G3D - LOGÍSTICA & FLETEROS', icon: '🚚', subtitle: 'Torre de control logística, fleteros, cadetería y rutas', scope: 'G3D' },
-    STOCK: { label: 'G3D - INVENTARIO & PROVEEDORES', icon: '🏷️', subtitle: 'Insumos, lista de costos de proveedores y reposición', scope: 'G3D' },
-    ADMIN: { label: 'ADMINISTRACIÓN CENTRAL', icon: '🛡️', subtitle: 'Gestión de roles, usuarios, privilegios y accesos maestros', scope: 'ADMIN' },
-    FINANZAS_CONSOLIDADAS: { label: 'FINANZAS & COMISIONES', icon: '💰', subtitle: 'Auditoría de caja, comisiones de venta y balances generales', scope: 'ADMIN' },
-    SEGURIDAD: { label: 'SEGURIDAD & AUDITORÍA', icon: '🔒', subtitle: 'Tokens de API, llaves de integración y registros del sistema', scope: 'ADMIN' },
-    CONFIGURACIONES: { label: 'AJUSTES & PERSONALIZACIÓN', icon: '⚙️', subtitle: 'Identidad, diseño de tienda, WhatsApp y parámetros globales', scope: 'ADMIN' },
-    INICIO: { label: 'PANTALLA DE INICIO (DASHBOARD)', icon: '🏠', subtitle: 'Visibilidad de accesos directos y tarjetas del menú', scope: 'ADMIN' },
-    UTILIDADES: { label: 'UTILIDADES & HERRAMIENTAS', icon: '🧰', subtitle: 'Simuladores y calculadoras técnicas', scope: 'ADMIN' },
+    XTV_ACCESO: { label: 'XTV ➔ ACCESO GENERAL', icon: '📺', subtitle: 'Ingreso al panel y visualización de la plataforma XTV', scope: 'XTV' },
+    XTV_LINEAS: { label: 'XTV ➔ LÍNEAS Y ACTIVACIONES', icon: '✨', subtitle: 'Creación directa por créditos, solicitudes de recarga y demos', scope: 'XTV' },
+    XTV_CLIENTES: { label: 'XTV ➔ GESTIÓN DE CLIENTES', icon: '👥', subtitle: 'Visualización privada (Mis Clientes) vs Supervisión Global', scope: 'XTV' },
+    XTV_RENOVACIONES: { label: 'XTV ➔ VENCIMIENTOS Y RENOVACIONES', icon: '🔄', subtitle: 'Alertas de vencimiento y renovación de cuentas', scope: 'XTV' },
+    XTV_SOLICITUDES: { label: 'XTV ➔ BANDEJA DE SOLICITUDES', icon: '📥', subtitle: 'Recepción, aprobación y despacho de líneas a revendedores', scope: 'XTV' },
+    XTV_FINANZAS: { label: 'XTV ➔ FINANZAS Y COMISIONES', icon: '💰', subtitle: 'Billetera personal, retiros y liquidaciones de red', scope: 'XTV' },
+    XTV_AJUSTES: { label: 'XTV ➔ CONFIGURACIÓN TÉCNICA', icon: '⚙️', subtitle: 'Gestión de planes minoristas, precios y servidor Xtream UI', scope: 'XTV' },
+    G3D: { label: 'TIENDA G3D (ACCESO COMPLETO)', icon: '🛍️', subtitle: 'Desbloqueo global de Catálogo, Pedidos, Stock, Logística y Proveedores', scope: 'G3D' },
+    ADMIN: { label: 'SISTEMA Y ADMINISTRACIÓN', icon: '🛡️', subtitle: 'Gestión integral de usuarios, contraseñas, roles y permisos RBAC', scope: 'ADMIN' },
   };
 
   // 1. CARGAR DATOS REALES DE SUPABASE: seguridad_roles y perfiles_locales
