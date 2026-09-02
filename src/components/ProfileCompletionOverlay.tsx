@@ -14,9 +14,7 @@ import {
   Loader2, 
   CheckCircle2, 
   Sparkles, 
-  AlertTriangle,
-  Landmark,
-  CreditCard
+  AlertTriangle 
 } from 'lucide-react';
 
 export function ProfileCompletionOverlay() {
@@ -27,12 +25,6 @@ export function ProfileCompletionOverlay() {
   const [direccion, setDireccion] = useState('');
   const [referencia, setReferencia] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
-
-  // Datos bancarios obligatorios para comisiones
-  const [alias, setAlias] = useState('');
-  const [cbu, setCbu] = useState('');
-  const [titular, setTitular] = useState('');
-  const [banco, setBanco] = useState('');
   
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -50,13 +42,6 @@ export function ProfileCompletionOverlay() {
       setDireccion(userProfile.direccion_hogar || userProfile.direccion || userProfile.datos_adicionales?.direccion_hogar || '');
       setReferencia(userProfile.referencia_personal || userProfile.referencia || userProfile.datos_adicionales?.referencia_personal || '');
       setAvatarUrl(userProfile.avatar_url || userProfile.foto_perfil || userProfile.datos_adicionales?.avatar_url || '');
-      
-      // Datos bancarios
-      const bankData = userProfile.negocio_datos_bancarios || userProfile.datos_adicionales?.negocio_datos_bancarios || {};
-      setAlias(userProfile.alias || bankData.alias || userProfile.datos_adicionales?.alias || '');
-      setCbu(userProfile.cbu || bankData.cbu || userProfile.datos_adicionales?.cbu || '');
-      setTitular(userProfile.titular || bankData.titular || userProfile.datos_adicionales?.titular || '');
-      setBanco(userProfile.banco || bankData.banco || userProfile.datos_adicionales?.banco || '');
     }
   }, [userProfile]);
 
@@ -132,15 +117,6 @@ export function ProfileCompletionOverlay() {
       return;
     }
 
-    if (!alias.trim() && !cbu.trim()) {
-      toast.error('El Alias o CBU/CVU bancario es obligatorio para la liquidación de tus comisiones');
-      return;
-    }
-    if (!titular.trim()) {
-      toast.error('El nombre del titular de la cuenta bancaria es obligatorio');
-      return;
-    }
-
     const currentPass = userProfile?.password_hash || userProfile?.password || userProfile?.clave;
     const needsPasswordChange = currentPass === '123456';
     let finalPassword = currentPass || '123456';
@@ -171,16 +147,6 @@ export function ProfileCompletionOverlay() {
         avatar_url: avatarUrl,
         foto_perfil: avatarUrl,
         password_hash: finalPassword,
-        alias: alias.trim(),
-        cbu: cbu.trim(),
-        titular: titular.trim(),
-        banco: banco.trim(),
-        negocio_datos_bancarios: {
-          alias: alias.trim(),
-          cbu: cbu.trim(),
-          titular: titular.trim(),
-          banco: banco.trim()
-        },
         datos_adicionales: {
           ...(userProfile?.datos_adicionales || {}),
           nombre: nombre.trim(),
@@ -189,17 +155,7 @@ export function ProfileCompletionOverlay() {
           referencia_personal: referencia.trim(),
           avatar_url: avatarUrl,
           foto_perfil: avatarUrl,
-          password_hash: finalPassword,
-          alias: alias.trim(),
-          cbu: cbu.trim(),
-          titular: titular.trim(),
-          banco: banco.trim(),
-          negocio_datos_bancarios: {
-            alias: alias.trim(),
-            cbu: cbu.trim(),
-            titular: titular.trim(),
-            banco: banco.trim()
-          }
+          password_hash: finalPassword
         }
       };
 
@@ -372,75 +328,6 @@ export function ProfileCompletionOverlay() {
                     placeholder="Ej: Portón de madera frente a la escuela"
                     className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-xs font-bold focus:ring-2 focus:ring-primary/20 dark:text-white"
                   />
-                </div>
-              </div>
-            </div>
-
-            {/* Bloque de Datos Bancarios para Cobro de Comisiones */}
-            <div className="p-4 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-800/40 rounded-2xl space-y-4">
-              <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
-                <Landmark size={18} />
-                <span className="text-xs font-bold uppercase tracking-wider">Datos Bancarios para Liquidación de Comisiones</span>
-              </div>
-              <p className="text-[10px] text-indigo-600/80 dark:text-indigo-400/80 font-medium">
-                Indica tu Alias, CBU o CVU para poder recibir los pagos y comisiones automáticas por tus ventas y renovaciones.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest block ml-1">Alias Bancario / MP *</label>
-                  <div className="relative">
-                    <CreditCard className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                    <input 
-                      type="text" required
-                      value={alias}
-                      onChange={(e) => setAlias(e.target.value)}
-                      placeholder="Ej: mi.cuenta.mp"
-                      className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-slate-800 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-400/20 dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest block ml-1">CBU / CVU</label>
-                  <div className="relative">
-                    <Landmark className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                    <input 
-                      type="text"
-                      value={cbu}
-                      onChange={(e) => setCbu(e.target.value)}
-                      placeholder="00000031000..."
-                      className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-slate-800 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-400/20 dark:text-white font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest block ml-1">Titular de la Cuenta *</label>
-                  <div className="relative">
-                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                    <input 
-                      type="text" required
-                      value={titular}
-                      onChange={(e) => setTitular(e.target.value)}
-                      placeholder="Nombre del Titular"
-                      className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-slate-800 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-400/20 dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest block ml-1">Banco o Billetera</label>
-                  <div className="relative">
-                    <CreditCard className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                    <input 
-                      type="text"
-                      value={banco}
-                      onChange={(e) => setBanco(e.target.value)}
-                      placeholder="Mercado Pago / Ualá / Banco"
-                      className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-slate-800 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-400/20 dark:text-white"
-                    />
-                  </div>
                 </div>
               </div>
             </div>

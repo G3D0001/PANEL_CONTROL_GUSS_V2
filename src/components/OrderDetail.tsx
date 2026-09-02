@@ -496,7 +496,7 @@ export function OrderDetail() {
                   <React.Fragment key={status}>
                     <div 
                       onClick={() => {
-                        if (hasPermission(PERMISSIONS.G3D.ACCESO_COMPLETO.id)) {
+                        if (hasPermission(PERMISSIONS.PEDIDOS.ACCEDER_PEDIDOS.id)) {
                           handleStatusChange(status as OrderStatus);
                         } else {
                           toast.error("No tienes permiso para cambiar el estado.");
@@ -505,7 +505,7 @@ export function OrderDetail() {
                       className={cn(
                         "relative flex flex-col items-center gap-3 cursor-pointer group transition-colors duration-150",
                         isActive ? "scale-110" : "",
-                        !hasPermission(PERMISSIONS.G3D.ACCESO_COMPLETO.id) && "opacity-50 cursor-not-allowed"
+                        !hasPermission(PERMISSIONS.PEDIDOS.ACCEDER_PEDIDOS.id) && "opacity-50 cursor-not-allowed"
                       )}
                     >
                       <div className={cn(

@@ -55,24 +55,6 @@ Eres un Arquitecto de Software y Desarrollador Full Stack experto. Mi objetivo e
 - **Storage:** Usamos el Storage Bucket `public_assets` en Supabase para logos y fotos.
 
 **Autorreflejo Reciente:**
-- **Resolución de Error de Hooks y Restauración de Integridad de Archivo (`Dashboard.tsx`)**:
-  1) **Restauración de Integridad UTF-8**: Se desarchivó y restauró el bloque de código del componente `Dashboard.tsx`, eliminando bytes binarios corruptos que causaban que la evaluación de módulos fallara e interrumpiera el contexto del despachador de React (`useState` / Rules of Hooks).
-  2) **Validación y Reinicio del Servidor**: Se verificó la conformidad de tipado con `tsc --noEmit`, se compiló la aplicación con `vite build` al 100% y se reinició el servidor de desarrollo en caliente.
-- **Saneamiento Integral de Sintaxis, Tipado TypeScript y Permisos Unificados (`Dashboard.tsx` / `IptvManagerView.tsx` / `Sidebar.tsx` / `OrderDetail.tsx`)**:
-  1) **Reparación Estructural y de Codificación UTF-8 en Dashboard**: Se depuró la estructura JSX del widget `mis_clientes` en `Dashboard.tsx`, resolviendo etiquetas desalineadas y asegurando el cierre ordenado de bloques y tablas.
-  2) **Corrección de Tipos y Estado en Creación de Cuentas Demo**: Se ajustaron las llamadas y estados de carga (`loading`) e importaciones de utilidad (`cn`) en `IptvManagerView.tsx` y `Dashboard.tsx`.
-  3) **Alineación con Permisos Maestros G3D**: Se reemplazaron referencias obsoletas a ramas descontinuadas (`PERMISSIONS.STOCK`, `PERMISSIONS.PEDIDOS`) por el permiso unificado `PERMISSIONS.G3D.ACCESO_COMPLETO` en `OrderDetail.tsx` y `Sidebar.tsx`, asegurando compilación 100% limpia sin errores en `tsc` ni en `vite build`.
-- **Sistema de Calificación Mensual y Actividad de Vendedores (`Dashboard.tsx`)**:
-  1) **Regla de Actividad de 30 Días**: Se implementó la verificación dinámica de ventas en los últimos 30 días para determinar si un revendedor está **Activo (100% de comisión)** o **Pasivo (50% de comisión)**.
-  2) **Bento Grid de Finanzas con Tarjeta de Calificación**: Se integró una tarjeta interactiva en el panel de finanzas que muestra en tiempo real el estatus del usuario (Activo/Pasivo), la cantidad de ventas en la ventana de 30 días y la tasa de comisión aplicable.
-  3) **Indicadores Visuales en Tablas**: Tanto la grilla de comisiones individuales como la lista de vendedores en "Mi Red" reflejan claramente el estatus de actividad con badges de alta visibilidad (`✓ 100% Activo` y `⏳ 50% Pasivo`).
-- **Implementación de Comisiones Multinivel en Planes Minoristas (`IptvManagerView.tsx`)**:
-  1) **Desdoblamiento de Comisiones**: Se reemplazó el campo genérico de comisión por dos entradas configurables e independientes: **Comisión Vendedor Directo** (`comision_vendedor`, ej: $4.000) y **Comisión Invitador / Red** (`comision_padre`, ej: $1.000).
-  2) **Desglose Matemático y Rentabilidad en Vivo**: El formulario de planes y el visualizador de tarjetas calculan automáticamente la ganancia neta central restando tanto el costo de créditos API como ambas comisiones en tiempo real.
-  3) **Badges Informativos en Catálogo**: Cada combo minorista muestra ahora de forma diferenciada la remuneración del vendedor (`Vend: $4.000`) y el incentivo de patrocinio (`Red: $1.000`).
-- **Eliminación y Depuración de Vista Residual de Invitaciones en XTV (`Dashboard.tsx`)**:
-  1) **Eliminación de Tarjeta Obsoleta**: Se retiró la tarjeta fija "Invitación (📩 Sumar Socios)" del Launchpad de inicio de XTV.
-  2) **Depuración de Sub-Sección Residual**: Se eliminó el bloque de código de más de 600 líneas que renderizaba el menú antiguo de invitaciones a vendedores/clientes con demos directas dentro de `Dashboard.tsx`, reduciendo el peso del bundle y evitando inconsistencias en los roles de los usuarios.
 - **Auditoría Integral y Unificación del Sistema de Permisos RBAC (`AuthContext.tsx` / `App.tsx` / `XtvUnifiedView.tsx` / `HomeView.tsx` / `Sidebar.tsx`)**:
   1) **Resolución de Alias y Coherencia de Permisos**: Se unificaron e interconectaron de forma bidireccional los alias de ingreso a XTV (`Iptv.InicioRevendedores.Ingresar` / `Iptv.InicioResendores.Ingresar` / `Inicio.Xtv.Acceder` / `Inicio.Xtv.Ver` / `Iptv.*`).
   2) **Desbloqueo de Rutas Protegidas (`ProtectedRoute` en `App.tsx`)**: `ProtectedRoute` ahora admite arreglos de permisos alternativos, permitiendo el ingreso al módulo `/xtv` si el usuario cuenta con el permiso de entrada o cualquiera de sus herramientas asociadas.
