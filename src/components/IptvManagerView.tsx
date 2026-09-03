@@ -11544,7 +11544,8 @@ ALTER TABLE public.iptv2_dispositivos_mac DISABLE ROW LEVEL SECURITY;`}
                               price: Number(planForm.value) || 0,
                               ...(editingPlanType === 'sale' ? {
                                 screens_api: planForm.screens_api !== '' ? Number(planForm.screens_api) : 1,
-                                comision: planForm.comision !== '' ? Number(planForm.comision) : 0
+                                comision_vendedor: planForm.comision_vendedor !== '' ? Number(planForm.comision_vendedor) : 0,
+                                comision_referente: planForm.comision_referente !== '' ? Number(planForm.comision_referente) : 0
                               } : {
                                 provider_name: planForm.provider_name ? planForm.provider_name.trim() : 'Lucas Mayorista',
                                 token_price: Number(planForm.token_price) || 1500,
@@ -11573,7 +11574,8 @@ ALTER TABLE public.iptv2_dispositivos_mac DISABLE ROW LEVEL SECURITY;`}
                           price: Number(planForm.value) || 0,
                           ...(editingPlanType === 'sale' ? {
                             screens_api: planForm.screens_api !== '' ? Number(planForm.screens_api) : 1,
-                            comision: planForm.comision !== '' ? Number(planForm.comision) : 0
+                            comision_vendedor: planForm.comision_vendedor !== '' ? Number(planForm.comision_vendedor) : 0,
+                            comision_referente: planForm.comision_referente !== '' ? Number(planForm.comision_referente) : 0
                           } : {
                             provider_name: planForm.provider_name ? planForm.provider_name.trim() : 'Lucas Mayorista',
                             token_price: Number(planForm.token_price) || 1500,
