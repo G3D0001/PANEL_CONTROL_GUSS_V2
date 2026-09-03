@@ -2713,7 +2713,9 @@ export const apiService = {
               tokens: Number(p.tokens),
               price: Number(p.price),
               screens_api: p.screens_api != null ? Number(p.screens_api) : Number(p.screens || 1),
-              comision: p.comision != null ? Number(p.comision) : 0
+              comision: p.comision != null ? Number(p.comision) : (p.comision_vendedor != null ? Number(p.comision_vendedor) : 0),
+              comision_vendedor: p.comision_vendedor != null ? Number(p.comision_vendedor) : (p.comision != null ? Number(p.comision) : 0),
+              comision_referente: p.comision_referente != null ? Number(p.comision_referente) : 0
             }));
           } else {
             dbSalePlans = Array.isArray(data.sale_plans) ? data.sale_plans : [];
@@ -2881,7 +2883,12 @@ export const apiService = {
           // 2. Realizar upsert individual de cada plan activo
           for (const plan of data.sale_plans) {
             const screensApiVal = plan.screens_api != null ? Number(plan.screens_api) : Number(plan.screens || 1);
-            const comisionVal = plan.comision != null ? Number(plan.comision) : 0;
+            const comisionVendedorVal = plan.comision_vendedor != null 
+              ? Number(plan.comision_vendedor) 
+              : (plan.comision != null ? Number(plan.comision) : 0);
+            const comisionReferenteVal = plan.comision_referente != null 
+              ? Number(plan.comision_referente) 
+              : 0;
 
             const fullPayload = {
               id: plan.id,
@@ -2893,7 +2900,9 @@ export const apiService = {
               tokens: Number(plan.tokens) || 0,
               price: Number(plan.price),
               screens_api: screensApiVal,
-              comision: comisionVal,
+              comision: comisionVendedorVal,
+              comision_vendedor: comisionVendedorVal,
+              comision_referente: comisionReferenteVal,
               categoria_nombre: plan.categoria_nombre || '',
               categoria_id: plan.categoria_id || 'vip'
             };
@@ -2905,21 +2914,43 @@ export const apiService = {
               
               if (upsertErr) throw upsertErr;
             } catch (err: any) {
-              console.warn("[saveIptvFinances] Upsert completo falló (posiblemente por columnas faltantes screens_api/comision), reintentando con payload seguro:", err.message || err);
-              // Fallback con payload seguro original (sin las nuevas columnas)
-              const safePayload = {
-                id: plan.id,
-                provider_plan_id: plan.provider_plan_id || null,
-                name: plan.name,
-                months: Number(plan.months),
-                hours: plan.hours != null ? Number(plan.hours) : 0,
-                screens: Number(plan.screens),
-                tokens: Number(plan.tokens) || 0,
-                price: Number(plan.price)
-              };
-              await supabase
-                .from('iptv_planes_venta')
-                .upsert([safePayload]);
+              console.warn("[saveIptvFinances] Upsert completo falló (posiblemente por columnas faltantes comision_vendedor/comision_referente), reintentando con payload clásico:", err.message || err);
+              try {
+                // Fallback con comision clásica si comision_vendedor/referente no existen aún
+                const legacyPayload = {
+                  id: plan.id,
+                  provider_plan_id: plan.provider_plan_id || null,
+                  name: plan.name,
+                  months: Number(plan.months),
+                  hours: plan.hours != null ? Number(plan.hours) : 0,
+                  screens: Number(plan.screens),
+                  tokens: Number(plan.tokens) || 0,
+                  price: Number(plan.price),
+                  screens_api: screensApiVal,
+                  comision: comisionVendedorVal,
+                  categoria_nombre: plan.categoria_nombre || '',
+                  categoria_id: plan.categoria_id || 'vip'
+                };
+                const { error: legErr } = await supabase
+                  .from('iptv_planes_venta')
+                  .upsert([legacyPayload]);
+                if (legErr) throw legErr;
+              } catch (legFallbackErr: any) {
+                // Fallback ultra seguro original
+                const safePayload = {
+                  id: plan.id,
+                  provider_plan_id: plan.provider_plan_id || null,
+                  name: plan.name,
+                  months: Number(plan.months),
+                  hours: plan.hours != null ? Number(plan.hours) : 0,
+                  screens: Number(plan.screens),
+                  tokens: Number(plan.tokens) || 0,
+                  price: Number(plan.price)
+                };
+                await supabase
+                  .from('iptv_planes_venta')
+                  .upsert([safePayload]);
+              }
             }
           }
         } catch (planErr: any) {

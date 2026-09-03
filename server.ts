@@ -230,6 +230,10 @@ async function startServer() {
   });
 
   // C) POST /api/iptv/xui (Proxy seguro para XC Reseller - Multi Panel)
+  // Caché de endpoint exitoso y caché en memoria para lecturas frecuentes
+  const xuiEndpointCache = new Map<string, { baseUrl: string; endpoint: string; format: { isGet: boolean; isForm: boolean } }>();
+  const xuiReadCache = new Map<string, { data: any; timestamp: number }>();
+
   app.post("/api/iptv/xui", async (req, res) => {
     const { action, xuiUrl, xuiToken, xuiAccessCode, username, password, packageId, id, package: reqPackage, ...extraParams } = req.body;
     
@@ -269,6 +273,16 @@ async function startServer() {
     }
     if (baseUrl.endsWith("/")) {
       baseUrl = baseUrl.slice(0, -1);
+    }
+
+    // Caché de lectura corto (10 segundos) para consultas no mutativas ("test", "packages", "get_lines", "get_line")
+    const isReadAction = action === "test" || action === "packages";
+    const cacheKey = `${baseUrl}_${xuiToken || ""}_${xuiAccessCode || autoExtractedAccessCode || ""}_${action}`;
+    if (isReadAction) {
+      const cached = xuiReadCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp < 10000)) {
+        return res.json(cached.data);
+      }
     }
 
     // 🎲 INTERCEPCIÓN EN TIEMPO REAL PARA EL HOST DE PRUEBA (contingencia simulada)
@@ -639,70 +653,61 @@ async function startServer() {
         hostWithoutPort = isHttps ? `https://${hostname}` : `http://${hostname}`;
       }
 
+      const finalAccessCode = (xuiAccessCode && xuiAccessCode.trim()) || autoExtractedAccessCode;
+
+      // Clave única del panel para recordar su endpoint exitoso
+      const panelKey = `${baseUrl}_${xuiToken || ""}_${finalAccessCode || ""}`;
+      const cachedEndpoint = xuiEndpointCache.get(panelKey);
+
       // Candidatos de base URL inteligentes para la API:
-      // 1. Probar en la URL exacta ingresada por el usuario
-      // 2. Probar en protocolo alternativo de la URL ingresada
-      // 3. Probar sin el puerto de streaming (que suele ser el verdadero panel de administración/API) en HTTPS
-      // 4. Probar sin el puerto de streaming en HTTP
-      const baseCandidates: string[] = [];
-      baseCandidates.push(baseUrl);
+      // Priorizamos la URL exacta que el usuario configuró
+      const baseCandidates: string[] = [baseUrl];
 
-      const altProtoBase = baseUrl.startsWith("https://") 
-        ? baseUrl.replace("https://", "http://") 
-        : baseUrl.replace("http://", "https://");
-      baseCandidates.push(altProtoBase);
-
+      // Si la URL no funcionó y tenía un puerto diferente a 80/443, solo entonces agregamos el host limpio
       if (baseUrl !== hostWithoutPort) {
         baseCandidates.push(hostWithoutPort);
-        const altCleanHost = hostWithoutPort.startsWith("https://")
-          ? hostWithoutPort.replace("https://", "http://")
-          : hostWithoutPort.replace("http://", "https://");
-        baseCandidates.push(altCleanHost);
       }
 
       const uniqueBases = Array.from(new Set(baseCandidates.filter(Boolean)));
       const attempts: Array<{ baseUrl: string; endpoint: string; format: { isGet: boolean; isForm: boolean } }> = [];
-      
-      const finalAccessCode = (xuiAccessCode && xuiAccessCode.trim()) || autoExtractedAccessCode;
 
-      // 1. Si hay access code o fue auto-extraído, probamos primero los endpoints directos de index.php reseller
+      // Si ya sabemos exactamente cuál funcionó antes para este panel, lo ponemos de PRIMERO absoluto
+      if (cachedEndpoint) {
+        attempts.push(cachedEndpoint);
+      }
+
+      // 1. Si hay access code o fue auto-extraído, probamos los endpoints estándar de reseller
       if (finalAccessCode) {
         const cleanCode = finalAccessCode.trim();
         for (const base of uniqueBases) {
-          // Intentará conectarse primero directo al script de reseller
           attempts.push({ baseUrl: base, endpoint: `/${cleanCode}/reseller/index.php`, format: { isGet: true, isForm: false } });
           attempts.push({ baseUrl: base, endpoint: `/${cleanCode}/reseller/index.php`, format: { isGet: false, isForm: true } });
-          attempts.push({ baseUrl: base, endpoint: `/${cleanCode}/reseller/index.php`, format: { isGet: false, isForm: false } });
           attempts.push({ baseUrl: base, endpoint: `/${cleanCode}/access/reseller/index.php`, format: { isGet: true, isForm: false } });
           attempts.push({ baseUrl: base, endpoint: `/${cleanCode}/access/reseller/index.php`, format: { isGet: false, isForm: true } });
-          attempts.push({ baseUrl: base, endpoint: `/${cleanCode}/access/reseller/index.php`, format: { isGet: false, isForm: false } });
           attempts.push({ baseUrl: base, endpoint: `/reseller/index.php`, format: { isGet: true, isForm: false } });
-          attempts.push({ baseUrl: base, endpoint: `/${cleanCode}/`, format: { isGet: true, isForm: false } });
-          attempts.push({ baseUrl: base, endpoint: `/${cleanCode}`, format: { isGet: true, isForm: false } });
-          attempts.push({ baseUrl: base, endpoint: `/${cleanCode}/`, format: { isGet: false, isForm: true } });
-          attempts.push({ baseUrl: base, endpoint: `/${cleanCode}/`, format: { isGet: false, isForm: false } });
         }
       }
 
-      // 2. Canales tradicionales alternativos y rutas directas /access/reseller/index.php para todo tipo de configuración
+      // 2. Canales tradicionales alternativos
       for (const base of uniqueBases) {
-        attempts.push({ baseUrl: base, endpoint: "/access/reseller/index.php", format: { isGet: false, isForm: true } });
-        attempts.push({ baseUrl: base, endpoint: "/access/reseller/index.php", format: { isGet: true, isForm: false } });
-        attempts.push({ baseUrl: base, endpoint: "/access/reseller/index.php", format: { isGet: false, isForm: false } });
-        attempts.push({ baseUrl: base, endpoint: "/reseller/index.php", format: { isGet: false, isForm: true } });
         attempts.push({ baseUrl: base, endpoint: "/reseller/index.php", format: { isGet: true, isForm: false } });
+        attempts.push({ baseUrl: base, endpoint: "/reseller/index.php", format: { isGet: false, isForm: true } });
+        attempts.push({ baseUrl: base, endpoint: "/access/reseller/index.php", format: { isGet: true, isForm: false } });
         attempts.push({ baseUrl: base, endpoint: "/api", format: { isGet: false, isForm: true } });
-        attempts.push({ baseUrl: base, endpoint: "/api", format: { isGet: false, isForm: false } });
-        attempts.push({ baseUrl: base, endpoint: "/api/reseller", format: { isGet: false, isForm: true } });
-        attempts.push({ baseUrl: base, endpoint: "/api/user", format: { isGet: false, isForm: true } });
       }
 
-      // Filtrar intentos según la acción para optimizar y asegurar el método adecuado (GET para get_line y get_lines)
-      let filteredAttempts = attempts;
+      // Deduplicar intentos conservando el orden de prioridad
+      const seenAttempts = new Set<string>();
+      let filteredAttempts = attempts.filter((att) => {
+        const key = `${att.baseUrl}__${att.endpoint}__${att.format.isGet}__${att.format.isForm}`;
+        if (seenAttempts.has(key)) return false;
+        seenAttempts.add(key);
+        return true;
+      });
+
+      // Filtrar según la acción
       if (action === "get_line" || action === "get_lines") {
-        filteredAttempts = attempts
-          .filter((a) => a.format.isGet)
-          .filter((v, i, a) => a.findIndex(t => (t.baseUrl === v.baseUrl && t.endpoint === v.endpoint)) === i);
+        filteredAttempts = filteredAttempts.filter((a) => a.format.isGet);
       }
 
       // Ejecución secuencial inteligente
@@ -979,6 +984,13 @@ async function startServer() {
           if (response.status === 429) {
             console.warn(`[XUI Proxy] ¡Advertencia! El servidor en ${attempt.baseUrl} devolvió limitación HTTP 429.`);
             lastError = "HTTP 429: Demasiadas peticiones. El servidor XUI.ONE ha limitado temporalmente las peticiones de este origen.";
+            // Circuit Breaker: si el panel nos pone 429, no insistir en más endpoints para no prolongar el bloqueo
+            break;
+          }
+
+          if (response.status === 521) {
+            console.warn(`[XUI Proxy] Host inalcanzable (Cloudflare 521) en ${attempt.baseUrl}${attempt.endpoint}. Omitiendo.`);
+            lastError = `HTTP 521: El servidor web de origen está apagado o no responde en el puerto probado.`;
             continue;
           }
 
@@ -994,6 +1006,8 @@ async function startServer() {
                   finalSuccess = true;
                   rawResponse = { success: true, text: responseText };
                   successBaseUrl = attempt.baseUrl;
+                  // Guardar endpoint exitoso en memoria
+                  xuiEndpointCache.set(panelKey, attempt);
                   break;
                 }
                 throw e;
@@ -1005,18 +1019,21 @@ async function startServer() {
                 finalSuccess = true;
                 rawResponse = parsed;
                 successBaseUrl = attempt.baseUrl;
+                xuiEndpointCache.set(panelKey, attempt);
                 break;
               } else if (action === "test") {
                 if (parsed && !parsed.error && parsed.success !== false) {
                   finalSuccess = true;
                   rawResponse = parsed;
                   successBaseUrl = attempt.baseUrl;
+                  xuiEndpointCache.set(panelKey, attempt);
                   console.log(`[XUI Proxy] ¡ÉXITO en testeo de conexión! Enlazado a: ${attempt.baseUrl}${attempt.endpoint}`);
                   break;
                 } else if (parsed === null || (parsed && parsed.status === "STATUS_SUCCESS")) {
                   finalSuccess = true;
                   rawResponse = parsed || { status: "STATUS_SUCCESS" };
                   successBaseUrl = attempt.baseUrl;
+                  xuiEndpointCache.set(panelKey, attempt);
                   break;
                 } else {
                   lastError = parsed.error || parsed.message || JSON.stringify(parsed);
@@ -1035,6 +1052,7 @@ async function startServer() {
                   finalSuccess = true;
                   rawResponse = parsed;
                   successBaseUrl = attempt.baseUrl;
+                  xuiEndpointCache.set(panelKey, attempt);
                   console.log(`[XUI Proxy] ¡ÉXITO en creación de cuenta! Creado en: ${attempt.baseUrl}${attempt.endpoint}`);
                   break;
                 } else {
@@ -1149,12 +1167,14 @@ async function startServer() {
       const playlistUrl = `${playlistBase}/get.php?username=${resolvedUser}&password=${resolvedPass}&output=ts`;
 
       if (action === "test") {
-        return res.json({
+        const responsePayload = {
           success: true,
           message: "¡Conectado exitosamente con tu panel XC Reseller!",
           detected_url: activeUsedBase,
           data: rawResponse
-        });
+        };
+        xuiReadCache.set(cacheKey, { data: responsePayload, timestamp: Date.now() });
+        return res.json(responsePayload);
       }
 
       const combinedWarnings = [
@@ -1163,13 +1183,17 @@ async function startServer() {
       ];
 
       if (action !== "create_demo" && action !== "create" && action !== "create_line") {
-        return res.json({
+        const responsePayload = {
           success: true,
           data: rawResponse,
           raw_response: rawResponse,
           warnings: combinedWarnings.length > 0 ? combinedWarnings : undefined,
           detected_url: activeUsedBase
-        });
+        };
+        if (isReadAction) {
+          xuiReadCache.set(cacheKey, { data: responsePayload, timestamp: Date.now() });
+        }
+        return res.json(responsePayload);
       }
 
       return res.json({

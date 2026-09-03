@@ -85,6 +85,8 @@ interface SalePlan {
   price: number;
   screens_api?: number;
   comision?: number;
+  comision_vendedor?: number;
+  comision_referente?: number;
   categoria_nombre?: string;
   categoria_id?: 'demo' | 'vip' | 'xxx';
 }
@@ -600,6 +602,8 @@ export function IptvManagerView() {
     provider_cost_id: string;
     screens_api: string | number;
     comision: string | number;
+    comision_vendedor: string | number;
+    comision_referente: string | number;
     categoria_nombre?: string;
     categoria_id?: 'demo' | 'vip' | 'xxx';
   }>({
@@ -615,6 +619,8 @@ export function IptvManagerView() {
     provider_cost_id: '', // ID del costo de proveedor enlazado en la base de datos (para provider)
     screens_api: '',
     comision: '',
+    comision_vendedor: '',
+    comision_referente: '',
     categoria_nombre: '',
     categoria_id: 'vip'
   });
@@ -1977,9 +1983,15 @@ _¡Gracias por confiar en nosotros! Disfrutá de la mejor televisión digital._`
         const actualPkgId = (isActiveXc ? sysConf.xc_package_id : sysConf.xui_package_id) || '1';
 
         if (actualUrl && actualToken) {
-          setTimeout(() => {
-            syncLiveCredits(true, actualUrl, actualToken, actualCode).catch(() => {});
-            syncXuiPackages(true, actualUrl, actualToken, actualCode, actualPkgId).catch(() => {});
+          setTimeout(async () => {
+            try {
+              // Secuenciar de forma ordenada para no disparar ráfagas concurrentes que saturen el panel remoto (evitando HTTP 429)
+              await syncLiveCredits(true, actualUrl, actualToken, actualCode);
+              await new Promise(r => setTimeout(r, 600));
+              await syncXuiPackages(true, actualUrl, actualToken, actualCode, actualPkgId);
+            } catch (syncErr) {
+              console.warn("Sincronización inicial en segundo plano completada con advertencias:", syncErr);
+            }
           }, 1200);
         }
       }
@@ -4013,7 +4025,9 @@ _¡Gracias por confiar en nosotros! Disfrutá de la mejor televisión digital._`
         provider_plan_id: plan.provider_plan_id || '',
         provider_cost_id: plan.provider_cost_id || '',
         screens_api: plan.screens_api != null ? plan.screens_api : (plan.screens || 1),
-        comision: plan.comision != null ? plan.comision : '',
+        comision: plan.comision_vendedor != null ? plan.comision_vendedor : (plan.comision != null ? plan.comision : ''),
+        comision_vendedor: plan.comision_vendedor != null ? plan.comision_vendedor : (plan.comision != null ? plan.comision : ''),
+        comision_referente: plan.comision_referente != null ? plan.comision_referente : '',
         categoria_nombre: plan.categoria_nombre || '',
         categoria_id: plan.categoria_id || 'vip',
         max_connections: plan.max_connections != null ? plan.max_connections : (plan.screens || 1),
@@ -4037,6 +4051,8 @@ _¡Gracias por confiar en nosotros! Disfrutá de la mejor televisión digital._`
         provider_cost_id: '',
         screens_api: matchedProv ? (matchedProv.max_connections || matchedProv.screens || 1) : 1,
         comision: '',
+        comision_vendedor: '',
+        comision_referente: '',
         categoria_nombre: '',
         categoria_id: 'vip',
         max_connections: matchedProv ? (matchedProv.max_connections || matchedProv.screens || 1) : 1,
@@ -4095,7 +4111,10 @@ _¡Gracias por confiar en nosotros! Disfrutá de la mejor televisión digital._`
       toast.success('Plan mayorista del proveedor actualizado');
     } else if (editingPlanType === 'sale') {
       const screensApiVal = planForm.screens_api !== '' ? Number(planForm.screens_api) : 1;
-      const comisionVal = planForm.comision !== '' ? Number(planForm.comision) : 0;
+      const comisionVendedorVal = planForm.comision_vendedor !== '' 
+        ? Number(planForm.comision_vendedor) 
+        : (planForm.comision !== '' ? Number(planForm.comision) : 0);
+      const comisionReferenteVal = planForm.comision_referente !== '' ? Number(planForm.comision_referente) : 0;
 
       // Validación activa contra límites actuales de la API de Proveedor
       const selProv = providerPlans.find(p => String(p.id) === String(planForm.provider_plan_id));
@@ -4125,7 +4144,9 @@ _¡Gracias por confiar en nosotros! Disfrutá de la mejor televisión digital._`
           tokens: Number(planForm.tokens),
           price: Number(planForm.value),
           screens_api: screensApiVal,
-          comision: comisionVal,
+          comision: comisionVendedorVal,
+          comision_vendedor: comisionVendedorVal,
+          comision_referente: comisionReferenteVal,
           categoria_nombre: planForm.categoria_nombre || '',
           categoria_id: planForm.categoria_id || 'vip'
         } : p);
@@ -4140,7 +4161,9 @@ _¡Gracias por confiar en nosotros! Disfrutá de la mejor televisión digital._`
           tokens: Number(planForm.tokens),
           price: Number(planForm.value),
           screens_api: screensApiVal,
-          comision: comisionVal,
+          comision: comisionVendedorVal,
+          comision_vendedor: comisionVendedorVal,
+          comision_referente: comisionReferenteVal,
           categoria_nombre: planForm.categoria_nombre || '',
           categoria_id: planForm.categoria_id || 'vip'
         }];
@@ -4454,8 +4477,10 @@ _¡Gracias por confiar en nosotros! Disfrutá de la mejor televisión digital._`
       if (salePlan) {
         if (acc.estado === 'Activo' && !vencido) {
           totalRevenue += salePlan.price;
-          // Sumamos la comisión del reseller al costo para deducirla de la ganancia limpia de caja
-          totalCost += (salePlan.comision || 0);
+          // Sumamos las comisiones del vendedor y referente al costo para deducirlas de la ganancia limpia de caja
+          const comVendedor = salePlan.comision_vendedor != null ? salePlan.comision_vendedor : (salePlan.comision || 0);
+          const comReferente = salePlan.comision_referente || 0;
+          totalCost += (comVendedor + comReferente);
         }
       } else {
         if (acc.estado === 'Activo' && !vencido) {
@@ -5203,7 +5228,7 @@ _¡Gracias por confiar en nosotros! Disfrutá de la mejor televisión digital._`
                                 if (col === 'profitArs') {
                                   const costVal = provPlan ? provPlan.cost : (acc.limite_pantallas || 2) * 1500;
                                   const priceVal = salePlan ? salePlan.price : 5000;
-                                  const comisionVal = salePlan ? (salePlan.comision || 0) : 0;
+                                  const comisionVal = salePlan ? ((salePlan.comision_vendedor ?? salePlan.comision ?? 0) + (salePlan.comision_referente ?? 0)) : 0;
                                   const profitVal = priceVal - costVal - comisionVal;
                                   return (
                                     <td key={col} className={`p-4 font-mono text-[11px] font-black bg-emerald-50/5 ${profitVal >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
@@ -5215,7 +5240,7 @@ _¡Gracias por confiar en nosotros! Disfrutá de la mejor televisión digital._`
                                 if (col === 'margin') {
                                   const costVal = provPlan ? provPlan.cost : (acc.limite_pantallas || 2) * 1500;
                                   const priceVal = salePlan ? salePlan.price : 5000;
-                                  const comisionVal = salePlan ? (salePlan.comision || 0) : 0;
+                                  const comisionVal = salePlan ? ((salePlan.comision_vendedor ?? salePlan.comision ?? 0) + (salePlan.comision_referente ?? 0)) : 0;
                                   const profitVal = priceVal - costVal - comisionVal;
                                   const marginPct = priceVal > 0 ? Math.round((profitVal / priceVal) * 100) : 0;
                                   return (
@@ -5718,8 +5743,10 @@ _¡Gracias por confiar en nosotros! Disfrutá de la mejor televisión digital._`
                           const selectedConnsApi = plan.screens_api || (originalPkg ? originalPkg.screens || 1 : 1);
                           const computedCredits = originalPkg ? calculateApiCreditCost(originalPkg, selectedConnsApi) : 0;
                           const costInArs = originalPkg ? getPlanCostInArs(computedCredits, originalPkg.provider_cost_id) : 0;
-                          const comision = plan.comision || 0;
-                          const profit = plan.price - costInArs - comision;
+                          const comisionVendedor = plan.comision_vendedor != null ? plan.comision_vendedor : (plan.comision || 0);
+                          const comisionReferente = plan.comision_referente || 0;
+                          const totalComisiones = comisionVendedor + comisionReferente;
+                          const profit = plan.price - costInArs - totalComisiones;
                           const hasProfit = profit > 0;
                           const roi = costInArs > 0 ? Math.round((profit / costInArs) * 100) : 100;
                           const hasScreenExceeded = originalPkg && plan.screens > selectedConnsApi;
@@ -5780,9 +5807,18 @@ _¡Gracias por confiar en nosotros! Disfrutá de la mejor televisión digital._`
                                     {!isManualPlan && (
                                       <>
                                         <span>| Conexiones XC (API): <strong className="text-indigo-500 font-bold">{selectedConnsApi} con.</strong></span>
-                                        {comision > 0 && (
-                                          <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 px-1 rounded text-[8px] font-bold uppercase">
-                                            Comisión: ${comision.toLocaleString("es-ES")}
+                                        {totalComisiones > 0 && (
+                                          <span className="flex items-center gap-1">
+                                            {comisionVendedor > 0 && (
+                                              <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 px-1 rounded text-[8px] font-bold uppercase">
+                                                Com. Vend: ${comisionVendedor.toLocaleString("es-ES")}
+                                              </span>
+                                            )}
+                                            {comisionReferente > 0 && (
+                                              <span className="bg-sky-100 dark:bg-sky-950/40 text-sky-700 dark:text-sky-400 px-1 rounded text-[8px] font-bold uppercase">
+                                                Com. Ref: ${comisionReferente.toLocaleString("es-ES")}
+                                              </span>
+                                            )}
                                           </span>
                                         )}
                                       </>
@@ -5798,7 +5834,11 @@ _¡Gracias por confiar en nosotros! Disfrutá de la mejor televisión digital._`
                                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-1 mt-1 border-t border-dashed border-slate-200 dark:border-slate-850">
                                       <span className="text-[8px] text-slate-400 uppercase">Finanzas:</span>
                                       <span className="text-[8.5px] text-slate-550 dark:text-slate-400">Costo: <strong className="text-rose-500 font-bold">${costInArs.toLocaleString("es-ES")}</strong></span>
-                                      {comision > 0 && <span className="text-[8.5px] text-slate-550 dark:text-slate-400 font-mono">Comisión: <strong className="text-amber-500 font-bold">${comision.toLocaleString("es-ES")}</strong></span>}
+                                      {totalComisiones > 0 && (
+                                        <span className="text-[8.5px] text-slate-550 dark:text-slate-400 font-mono">
+                                          Comisiones: {comisionVendedor > 0 && <strong className="text-amber-500 font-bold" title="Comisión vendedor de la línea">${comisionVendedor.toLocaleString("es-ES")} (Vend.)</strong>} {comisionReferente > 0 && <strong className="text-sky-500 font-bold" title="Comisión usuario referente">${comisionReferente.toLocaleString("es-ES")} (Ref.)</strong>}
+                                        </span>
+                                      )}
                                       <span className="text-[8.5px] text-slate-550 dark:text-slate-400">Ganancia Neta: <strong className={`${hasProfit ? "text-emerald-500" : "text-slate-500"} font-black`}>${profit.toLocaleString("es-ES")}</strong></span>
                                       {costInArs > 0 && (
                                         <span className={`text-[8.5px] px-1 rounded-md font-bold uppercase leading-none ${roi > 100 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-slate-100 text-slate-600 dark:bg-slate-850 dark:text-slate-400"}`}>
@@ -10925,8 +10965,12 @@ ALTER TABLE public.iptv2_dispositivos_mac DISABLE ROW LEVEL SECURITY;`}
                 
                 // Cálculos de rentabilidad interactivos
                 const precioVenta = Number(planForm.value) || 0;
-                const comisionVenta = Number(planForm.comision) || 0;
-                const gananciaEstimada = precioVenta - costArs - comisionVenta;
+                const comisionVendedor = planForm.comision_vendedor !== '' 
+                  ? Number(planForm.comision_vendedor) 
+                  : (planForm.comision !== '' ? Number(planForm.comision) : 0);
+                const comisionReferente = Number(planForm.comision_referente) || 0;
+                const totalComisionesVenta = comisionVendedor + comisionReferente;
+                const gananciaEstimada = precioVenta - costArs - totalComisionesVenta;
                 const roiPercent = costArs > 0 ? Math.round((gananciaEstimada / costArs) * 100) : 100;
                 
                 return (
@@ -10951,7 +10995,9 @@ ALTER TABLE public.iptv2_dispositivos_mac DISABLE ROW LEVEL SECURITY;`}
                               tokens: calculatedTokens,
                               name: `${matchedProv.name} (Venta)`,
                               screens_api: defaultScreens,
-                              comision: planForm.comision || ''
+                              comision: planForm.comision || '',
+                              comision_vendedor: planForm.comision_vendedor || planForm.comision || '',
+                              comision_referente: planForm.comision_referente || ''
                             });
                             toast.info(`Datos del catálogo API importados: "${matchedProv.name}"`);
                           } else {
@@ -11142,22 +11188,57 @@ ALTER TABLE public.iptv2_dispositivos_mac DISABLE ROW LEVEL SECURITY;`}
                       </div>
                     )}
 
-                    {/* Comisión de Venta */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-slate-400">Comisión de Venta para Resellers (ARS)</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0"
-                        value={planForm.comision}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9.]/g, '');
-                          const parts = val.split('.');
-                          const cleanedVal = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
-                          setPlanForm({ ...planForm, comision: cleanedVal });
-                        }}
-                        className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border text-xs font-black rounded-xl focus:outline-none dark:border-slate-800 placeholder-slate-300 text-slate-900 dark:text-white"
-                      />
+                    {/* Comisiones: Vendedor de la línea y Usuario Referente */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50/80 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400 flex items-center justify-between">
+                          <span>Comisión Vendedor (ARS)</span>
+                          <span className="text-[8.5px] font-bold text-slate-400">Venta directa</span>
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0"
+                          value={planForm.comision_vendedor !== '' ? planForm.comision_vendedor : planForm.comision}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9.]/g, '');
+                            const parts = val.split('.');
+                            const cleanedVal = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
+                            setPlanForm({ 
+                              ...planForm, 
+                              comision_vendedor: cleanedVal,
+                              comision: cleanedVal 
+                            });
+                          }}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-amber-300 dark:border-amber-800/60 text-xs font-black rounded-xl focus:outline-none placeholder-slate-300 text-slate-900 dark:text-white"
+                        />
+                        <p className="text-[8px] text-slate-400 leading-tight">
+                          Ganancia fija en ARS para el revendedor que genera la línea.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-black uppercase text-sky-600 dark:text-sky-400 flex items-center justify-between">
+                          <span>Comisión Referente (ARS)</span>
+                          <span className="text-[8.5px] font-bold text-slate-400">Patrocinador</span>
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0"
+                          value={planForm.comision_referente}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9.]/g, '');
+                            const parts = val.split('.');
+                            const cleanedVal = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
+                            setPlanForm({ ...planForm, comision_referente: cleanedVal });
+                          }}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-sky-300 dark:border-sky-800/60 text-xs font-black rounded-xl focus:outline-none placeholder-slate-300 text-slate-900 dark:text-white"
+                        />
+                        <p className="text-[8px] text-slate-400 leading-tight">
+                          Ganancia para el usuario/líder que dio de alta a dicho vendedor.
+                        </p>
+                      </div>
                     </div>
 
                     {/* Monto Final de Venta Minorista */}
@@ -11203,11 +11284,29 @@ ALTER TABLE public.iptv2_dispositivos_mac DISABLE ROW LEVEL SECURITY;`}
                         </span>
                       </div>
 
-                      {comisionVenta > 0 && (
+                      {comisionVendedor > 0 && (
                         <div className="flex justify-between items-center text-slate-500">
-                          <span>Comisión Reseller (Deducible):</span>
+                          <span>Comisión Vendedor Directo:</span>
                           <span className="font-extrabold text-amber-600 font-mono">
-                            -${comisionVenta.toLocaleString('es-ES')} ARS
+                            -${comisionVendedor.toLocaleString('es-ES')} ARS
+                          </span>
+                        </div>
+                      )}
+
+                      {comisionReferente > 0 && (
+                        <div className="flex justify-between items-center text-slate-500">
+                          <span>Comisión Usuario Referente:</span>
+                          <span className="font-extrabold text-sky-600 font-mono">
+                            -${comisionReferente.toLocaleString('es-ES')} ARS
+                          </span>
+                        </div>
+                      )}
+
+                      {totalComisionesVenta > 0 && (
+                        <div className="flex justify-between items-center text-slate-500 border-t dark:border-slate-850/40 pt-1">
+                          <span className="font-bold text-slate-700 dark:text-slate-300">Total Comisiones Deducibles:</span>
+                          <span className="font-extrabold text-amber-700 dark:text-amber-400 font-mono">
+                            -${totalComisionesVenta.toLocaleString('es-ES')} ARS
                           </span>
                         </div>
                       )}
