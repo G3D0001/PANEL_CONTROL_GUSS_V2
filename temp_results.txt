@@ -1,0 +1,17 @@
+src/components/SellersManager.tsx:          Administra los perfiles de los negocios que venden en tu plataforma.
+src/components/SellersManager.tsx:          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Cargando perfiles...</p>
+src/components/SettingsView.tsx:        .from('usuarios_perfiles')
+src/components/SettingsView.tsx:        .from('usuarios_perfiles')
+src/components/SettingsView.tsx:        .from('usuarios_perfiles')
+src/components/SettingsView.tsx:        .from('usuarios_perfiles')
+src/components/SettingsView.tsx:      const { data: profiles } = await supabase.from('usuarios_perfiles').select('*');
+src/components/SettingsView.tsx:      await supabase.from('usuarios_perfiles').update({ password_hash: hashedPassword }).eq('email', email);
+src/components/SettingsView.tsx:      await supabase.from('usuarios_perfiles').delete().eq('email', email);
+src/components/PermissionsManager.tsx:          .from('perfiles')
+src/components/WelcomeForm.tsx:      const targetTable = 'usuarios_perfiles';
+src/components/WelcomeForm.tsx:      const targetTable = 'usuarios_perfiles';
+src/components/OrderDetail.tsx:           const { data } = await supabase.from('usuarios_perfiles').select('*').eq('email', found.vendedor).maybeSingle();
+src/services/apiService.ts:        .from('usuarios_perfiles')
+src/services/apiService.ts:        .from('usuarios_perfiles')
+src/services/apiService.ts:          vendedor:usuarios_perfiles(*)
+src/context/AppContext.tsx:        .from('perfil_negocio')
